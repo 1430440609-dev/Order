@@ -1,0 +1,21 @@
+[
+  {
+    "id": "名片/抖音（名字+邮箱）",
+    "kind": "名片",
+    "name": "抖音（名字+邮箱）",
+    "psd": "template-assets/名片/抖音（名字+邮箱）.psd",
+    "preview": "template-assets/名片/抖音（名字+邮箱）.png",
+    "fields": [
+      {
+        "label": "名字",
+        "layer": "Ziman Xu",
+        "example": "Ziman Xu"
+      },
+      {
+        "label": "邮箱",
+        "layer": "ziman.xu@bytedances.com.cn",
+        "example": "ziman.xu@bytedances.com.cn"
+      }
+    ]
+  }
+]

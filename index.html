@@ -1053,11 +1053,15 @@ function bookingNameToPinyin(value){
   const surnameLength=compound?2:1;
   return `${syllables.slice(0,surnameLength).join('')} ${syllables.slice(surnameLength).join('')}`.trim();
 }
-function bookingPasteDate(raw){
+function bookingPasteDate(raw,shortYear){
   if(!raw)return '';
-  const m=String(raw).trim().match(/^(\d{4})[.\-/年](\d{1,2})[.\-/月](\d{1,2})/);
-  if(!m)return '';
-  const y=+m[1],mo=+m[2],day=+m[3],date=new Date(Date.UTC(y,mo-1,day));
+  const value=String(raw).trim();
+  const full=value.match(/^(\d{4})[.\-/年](\d{1,2})[.\-/月](\d{1,2})/);
+  const short=value.match(/^(\d{1,2})[.\-/月](\d{1,2})(?:日)?$/);
+  if(!full&&!short)return '';
+  const y=full?+full[1]:shortYear,mo=+(full?full[2]:short[1]),day=+(full?full[3]:short[2]);
+  if(!Number.isInteger(y))return '';
+  const date=new Date(Date.UTC(y,mo-1,day));
   if(date.getUTCFullYear()!==y||date.getUTCMonth()+1!==mo||date.getUTCDate()!==day)return '';
   return `${y}-${String(mo).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
 }
@@ -1087,7 +1091,19 @@ function parseBookingPaste(raw,romanize=bookingNameToPinyin){
   if(/[\u3400-\u9fff]/.test(name))name=romanize(name);
   else name=name.trim().replace(/\s+/g,' ').toUpperCase();
   const placedRaw=get('下单日期','下单时间'),checkinRaw=get('入住时间','入住日期'),checkoutRaw=get('离店时间','离店日期','退房时间');
-  const placed=bookingPasteDate(placedRaw),checkin=bookingPasteDate(checkinRaw),checkout=bookingPasteDate(checkoutRaw);
+  const hasYear=value=>/^\d{4}[.\-/年]/.test(value);
+  const explicitYear=[placedRaw,checkinRaw,checkoutRaw].find(hasYear);
+  const chinaYear=Number(new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Shanghai',year:'numeric'}).format(new Date()));
+  const baseYear=explicitYear?Number(explicitYear.slice(0,4)):chinaYear;
+  let placed=bookingPasteDate(placedRaw,baseYear),checkin=bookingPasteDate(checkinRaw,baseYear),checkout=bookingPasteDate(checkoutRaw,baseYear);
+  if(placed&&!hasYear(placedRaw)&&checkin&&hasYear(checkinRaw)&&placed>checkin)placed=bookingPasteDate(placedRaw,baseYear-1);
+  if(checkin&&!hasYear(checkinRaw)&&checkout&&hasYear(checkoutRaw)&&checkin>checkout)checkin=bookingPasteDate(checkinRaw,baseYear-1);
+  if(checkin&&!hasYear(checkinRaw)&&placed&&checkin<placed)checkin=bookingPasteDate(checkinRaw,Number(placed.slice(0,4))+1);
+  if(checkout&&!hasYear(checkoutRaw)&&checkin&&checkout<checkin){
+    const checkinYear=Number(checkin.slice(0,4));
+    checkout=bookingPasteDate(checkoutRaw,checkinYear);
+    if(checkout<checkin)checkout=bookingPasteDate(checkoutRaw,checkinYear+1);
+  }
   const nights=checkin&&checkout?Math.max(0,Math.round((Date.parse(checkout+'T00:00:00Z')-Date.parse(checkin+'T00:00:00Z'))/86400000)):0;
   const deposit=bookingPasteAmount(get('代订费','定金'));
   const balance=bookingPasteAmount(get('尾款'));
@@ -1096,8 +1112,11 @@ function parseBookingPaste(raw,romanize=bookingNameToPinyin){
   const paymentRaw=get('付款信息','付款方式','支付方式');
   const payment=normalizePaymentMethod(paymentRaw);
   const notes=[];
+  const headerNote=String(raw||'').match(/【酒店确认下单信息】\s*[（(]([^）)]+)[）)]/);
+  if(headerNote?.[1]?.trim())notes.push('模板说明：'+headerNote[1].trim());
   const room=get('房型');if(room)notes.push('房型：'+room);
   const operator=get('操作人');if(operator)notes.push('操作人：'+operator);
+  const paidDate=get('回款日期');if(paidDate)notes.push('回款日期：'+paidDate);
   if(guest&&/[\u3400-\u9fff]/.test(guest))notes.push('原始中文姓名：'+guest);
   const warnings=[];
   for(const [label,value,date] of [['下单日期',placedRaw,placed],['入住日期',checkinRaw,checkin],['离店日期',checkoutRaw,checkout]])

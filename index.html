@@ -276,6 +276,23 @@ main{min-width:0;max-width:100%;}
 .commission-feedback{margin:0 0 8px;color:#53647f;font-size:12px}
 .commission-feedback:empty{display:none}
 .commission-dialog .modal-actions{flex-wrap:wrap}
+
+.commission-toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:9px 13px;padding:11px 14px;margin-bottom:12px}
+.commission-select-all{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.commission-select-all input,.commission-select-order input{width:16px;height:16px;accent-color:var(--blue)}
+.commission-select-order{flex:none;display:inline-flex}
+#commissionSelectedCount{font-size:12px;color:#66748a}
+.commission-bulk-actions,.commission-card-actions{display:flex;align-items:center;flex-wrap:wrap;gap:7px}
+.commission-bulk-actions{margin-inline-start:auto}
+.commission-bulk-actions .btn,.commission-bulk-actions .filter,.commission-card-actions .btn,.commission-card-actions .filter{
+  min-height:32px;padding:5px 9px;font-size:12px
+}
+.commission-card-actions{padding-top:9px;border-top:1px solid var(--line)}
+.commission-card-actions .filter{margin-inline-end:auto}
+#commissionBulkCopy:disabled,#commissionBulkSettlement:disabled{opacity:.55;cursor:default}
+@media(max-width:450px){
+  .commission-bulk-actions{width:100%;margin-inline-start:0}
+}
 </style></head>
 <body>
 <div id="loginPage" class="login"><div class="login-card"><div class="brand"><div class="mark">单</div><span>订单 <span style="color:#9ba8be;font-weight:500">ORDER DESK</span></span></div><h1>欢迎回来</h1><p class="sub">登录酒店订单管理工作台</p><form id="loginForm"><label class="field">账号<input id="loginUser" autocomplete="username" placeholder="请输入账号" required></label><label class="field">密码<input id="loginPass" type="password" autocomplete="current-password" placeholder="请输入密码" required></label><div id="loginError" style="color:#d45e5e;font-size:12px;min-height:18px"></div><button class="btn primary wide">登录工作台</button></form></div></div>
@@ -306,6 +323,18 @@ main{min-width:0;max-width:100%;}
   <div class="page-head">
     <div><h1>我要提提成</h1><div class="crumb">工作台　/　我要提提成</div></div>
   </div>
+  <div class="panel commission-toolbar">
+    <label class="commission-select-all"><input type="checkbox" id="commissionSelectAll">全选</label>
+    <span id="commissionSelectedCount" aria-live="polite">已选 0 笔</span>
+    <div class="commission-bulk-actions">
+      <button type="button" class="btn" id="commissionBulkCopy" disabled>批量复制</button>
+      <select class="filter" id="commissionBulkSettlement" aria-label="批量设置结款状态" disabled>
+        <option value="">批量设置结款</option>
+        <option value="已结款">设为已结款</option>
+        <option value="未结款">设为未结款</option>
+      </select>
+    </div>
+  </div>
   <div id="commissionCards" class="commission-grid"></div>
 </section>
 <section id="staffView" class="hidden"><div class="page-head"><div><h1>员工账号</h1><div class="crumb">系统设置　/　员工管理</div></div></div><div class="panel admin-box"><div class="panel-head" style="padding:20px 22px 0"><h3>添加员工</h3><span class="small-note">员工订单与其他账号隔离</span></div><form id="addStaffForm" class="admin-add"><input id="newStaffUser" placeholder="登录账号" required><input id="newStaffPass" type="password" minlength="8" placeholder="初始密码（至少 8 位）" required><button class="btn primary">添加账号</button></form><div class="admin-list" id="staffList"></div></div><div class="panel admin-box" style="margin-top:16px;padding:20px 22px"><div class="panel-head"><h3>全局页面设置</h3><span class="small-note">保存后所有账号同步生效</span></div><form id="settingsForm" style="display:flex;gap:10px;align-items:end;flex-wrap:wrap"><label class="field" style="flex:1;min-width:220px;margin:0">页面标题<input id="settingsTitle" maxlength="80" required></label><button class="btn primary">保存设置</button></form></div></section></main></div></div>
@@ -327,6 +356,14 @@ main{min-width:0;max-width:100%;}
     </div>
   </form>
 </dialog>
+
+<dialog id="commissionCopyFallback" class="commission-dialog" aria-labelledby="commissionCopyFallbackTitle">
+  <div class="modal-head"><div class="modal-title"><h2 id="commissionCopyFallbackTitle">手动复制提成文案</h2></div></div>
+  <div class="commission-dialog-body">
+    <label class="field">文案已选中，请复制<textarea id="commissionCopyFallbackText" readonly></textarea></label>
+  </div>
+  <div class="modal-actions"><button type="button" class="btn" id="closeCommissionCopyFallback">关闭</button></div>
+</dialog>
 <div id="modalRoot"></div><div id="importProgress" class="import-progress hidden" role="status" aria-live="polite"><div class="import-progress-head"><strong id="importProgressTitle">准备导入</strong><button type="button" id="closeImportProgress" aria-label="关闭">×</button></div><div class="import-progress-track"><div id="importProgressFill"></div></div><div id="importProgressDetail" class="import-progress-detail"></div></div><div id="toast" class="toast hidden"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -337,7 +374,7 @@ let current=null, orders=[], users=[], activeCategory='全部', sharedSettings={
 function errText(e){return e?.message||'云端请求失败，请稍后重试'}
 function withTimeout(promise,ms,label){return Promise.race([promise,new Promise((_,reject)=>setTimeout(()=>reject(new Error(label)),ms))])}
 let xlsxLoader;function loadXlsx(){if(window.XLSX)return Promise.resolve();if(!xlsxLoader)xlsxLoader=new Promise((resolve,reject)=>{const script=document.createElement('script');script.async=true;script.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';const timer=setTimeout(()=>{xlsxLoader=null;reject(new Error('Excel解析组件加载超时，请检查网络后重试'))},20000);script.onload=()=>{clearTimeout(timer);resolve()};script.onerror=()=>{clearTimeout(timer);xlsxLoader=null;reject(new Error('Excel解析组件连接失败，请检查网络后重试'))};document.head.appendChild(script)});return xlsxLoader}
-async function loadOrders(){const {data,error}=await sb.from('orders').select('*').order('created_at',{ascending:false});if(error)throw error;orders=(data||[]).map(r=>({id:r.id,ownerId:r.owner_id,owner:current.username,commissionName:r.commission_customer_name||'',no:r.confirmation_no,company:r.company,hotel:r.hotel,name:r.guest_name,placed:r.placed_date,checkin:r.checkin_date||'',checkout:r.checkout_date||'',nights:r.nights,days:r.days,cost:r.cost,quote:r.quote,deposit:r.deposit,balance:r.balance,profit:r.profit,paid:r.paid_status,payment:r.payment_method,status:r.stay_status,category:r.order_type==='全部订单'?'':r.order_type,note:r.note,created:r.created_at}));
+async function loadOrders(){const {data,error}=await sb.from('orders').select('*').order('created_at',{ascending:false});if(error)throw error;orders=(data||[]).map(r=>({id:r.id,ownerId:r.owner_id,owner:current.username,commissionName:r.commission_customer_name||'',commissionSettlement:r.commission_settlement_status||'未结款',no:r.confirmation_no,company:r.company,hotel:r.hotel,name:r.guest_name,placed:r.placed_date,checkin:r.checkin_date||'',checkout:r.checkout_date||'',nights:r.nights,days:r.days,cost:r.cost,quote:r.quote,deposit:r.deposit,balance:r.balance,profit:r.profit,paid:r.paid_status,payment:r.payment_method,status:r.stay_status,category:r.order_type==='全部订单'?'':r.order_type,note:r.note,created:r.created_at}));
 }
 function toDbOrder(o){return {id:o.id,owner_id:current.id,confirmation_no:o.no||'',company:o.company||'',hotel:o.hotel||'',guest_name:o.name||'',placed_date:o.placed||new Date().toISOString().slice(0,10),checkin_date:o.checkin||null,checkout_date:o.checkout||null,nights:Number(o.nights)||0,days:Number(o.days)||0,cost:Number(o.cost)||0,quote:Number(o.quote)||0,deposit:Number(o.deposit)||0,balance:Number(o.balance)||0,profit:Number(o.profit)||0,paid_status:o.paid||'待定',payment_method:o.payment||'闲鱼',stay_status:o.status||'待定',order_type:o.category||'全部订单',note:o.note||'',created_at:o.created||new Date().toISOString(),updated_at:new Date().toISOString()}}
 async function saveOrder(o){const {error}=await sb.from('orders').upsert(toDbOrder(o));if(error)throw error;await loadOrders()}
@@ -345,7 +382,7 @@ async function loadSettings(){const {data,error}=await sb.from('app_settings').s
 async function init(){const {data,error}=await sb.auth.getSession();if(error)console.error(error);if(data.session)await openApp(data.session.user)}
 async function openApp(authUser){const {data:profile,error}=await withTimeout(sb.from('profiles').select('id,username,role').eq('id',authUser.id).single(),15000,'云端连接超时，请检查当前电脑的网络后重试');if(error){$('#loginError').textContent='账号资料读取失败：'+errText(error);await sb.auth.signOut();return}current={...profile,email:authUser.email};$('#loginPage').classList.add('hidden');$('#app').classList.remove('hidden');$('#who').textContent=current.username;$('#avatar').textContent=current.username.slice(0,1).toUpperCase();$('#roleBadge').textContent=current.role==='admin'?'管理员':'员工';$('#adminNav').classList.toggle('hidden',current.role!=='admin');try{await Promise.all([loadOrders(),loadSettings()]);render();toast('云端数据已加载')}catch(e){toast('读取云端数据失败：'+errText(e))}}
 $('#loginForm').onsubmit=async e=>{e.preventDefault();const username=$('#loginUser').value.trim().toLowerCase(),password=$('#loginPass').value,button=$('#loginForm button');button.disabled=true;button.textContent='正在连接云端…';$('#loginError').textContent='';try{const {data,error}=await withTimeout(sb.auth.signInWithPassword({email:username+'@orders.example.com',password}),15000,'云端登录连接超时，请检查当前电脑网络是否能访问 Supabase');if(error){$('#loginError').textContent=/invalid login credentials/i.test(error.message)?'账号或密码错误':'登录失败：'+errText(error);return}await openApp(data.user)}catch(err){$('#loginError').textContent=errText(err)}finally{button.disabled=false;button.textContent='登录工作台'}};
-$('#logoutBtn').onclick=async()=>{await sb.auth.signOut();current=null;orders=[];$('#app').classList.add('hidden');$('#loginPage').classList.remove('hidden')};
+$('#logoutBtn').onclick=async()=>{await sb.auth.signOut();current=null;orders=[];commissionSelectedIds.clear();$('#app').classList.add('hidden');$('#loginPage').classList.remove('hidden')};
 function mine(){return orders}function esc(x=''){return String(x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}function money(n){return '¥'+(Number(n)||0).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2})}function statusPill(s){return '<span class="pill '+(s==='是'?'ok':s==='否'?'no':'wait')+'">'+esc(s||'待定')+'</span>'}
 function checkinWindow(now=new Date()){
   const parts=new Intl.DateTimeFormat('en-GB',{
@@ -545,20 +582,94 @@ function commissionOrders(orders){
     .sort((a,b)=>(b.checkout||'').localeCompare(a.checkout||''));
 }
 
+
+const COMMISSION_SETTLEMENT_STATES=['未结款','已结款'];
+const commissionSelectedIds=new Set();
+let commissionSettlementSaving=false;
+
+function getSelectedCommissionOrders(){
+  return commissionOrders(mine()).filter(order=>commissionSelectedIds.has(order.id));
+}
+
+function updateCommissionSelection(visibleOrders=commissionOrders(mine())){
+  const count=visibleOrders.filter(order=>commissionSelectedIds.has(order.id)).length;
+  const selectAll=$('#commissionSelectAll');
+  selectAll.checked=count>0&&count===visibleOrders.length;
+  selectAll.indeterminate=count>0&&count<visibleOrders.length;
+  selectAll.disabled=visibleOrders.length===0;
+  $('#commissionSelectedCount').textContent=`已选 ${count} 笔`;
+  $('#commissionBulkCopy').disabled=count===0;
+  $('#commissionBulkSettlement').disabled=count===0||commissionSettlementSaving;
+}
+
 function renderCommission(){
-  const cards=commissionOrders(mine()).map(order=>`
+  const visibleOrders=commissionOrders(mine());
+  const visibleIds=new Set(visibleOrders.map(order=>order.id));
+  for(const id of commissionSelectedIds){
+    if(!visibleIds.has(id))commissionSelectedIds.delete(id);
+  }
+  const cards=visibleOrders.map(order=>`
     <article class="panel commission-card">
       <div class="commission-card-head">
         <h2>${esc(order.hotel||'未填写酒店')}</h2>
-        <button type="button" class="btn" data-commission-order="${esc(order.id)}">编辑</button>
+        <label class="commission-select-order">
+          <input type="checkbox" data-commission-select="${esc(order.id)}"
+            aria-label="选择${esc(order.hotel||'这笔订单')}" ${commissionSelectedIds.has(order.id)?'checked':''}>
+        </label>
       </div>
       <dl>
         <div><dt>是否回款</dt><dd>${statusPill(order.paid)}</dd></div>
         <div><dt>定金</dt><dd>${money(order.deposit)}</dd></div>
         <div><dt>利润</dt><dd class="profit">${money(order.profit)}</dd></div>
       </dl>
+      <div class="commission-card-actions">
+        <select class="filter" data-settlement-order="${esc(order.id)}" aria-label="提成结款状态"
+          ${commissionSettlementSaving?'disabled':''}>
+          ${COMMISSION_SETTLEMENT_STATES.map(state=>`
+            <option${state===order.commissionSettlement?' selected':''}>${state}</option>`).join('')}
+        </select>
+        <button type="button" class="btn" data-commission-copy="${esc(order.id)}">复制</button>
+        <button type="button" class="btn" data-commission-order="${esc(order.id)}">编辑</button>
+      </div>
     </article>`).join('');
   $('#commissionCards').innerHTML=cards||'<div class="panel commission-empty">暂无已回款订单</div>';
+  updateCommissionSelection(visibleOrders);
+}
+
+async function setCommissionSettlement(ids,state){
+  const ownerId=current?.id;
+  if(!ownerId||commissionSettlementSaving||!ids.length||!COMMISSION_SETTLEMENT_STATES.includes(state))return;
+  commissionSettlementSaving=true;
+  $$('#commissionCards [data-settlement-order]').forEach(select=>{select.disabled=true;});
+  updateCommissionSelection();
+  let savedCount=0;
+  try{
+    const batchSize=40;
+    for(let i=0;i<ids.length;i+=batchSize){
+      const batch=ids.slice(i,i+batchSize);
+      const {data,error}=await sb.from('orders')
+        .update({commission_settlement_status:state,updated_at:new Date().toISOString()})
+        .eq('owner_id',ownerId)
+        .eq('paid_status','是')
+        .in('id',batch)
+        .select('id,commission_settlement_status');
+      if(current?.id!==ownerId)return;
+      if(error)throw error;
+      const ordersById=new Map(mine().map(order=>[order.id,order]));
+      for(const row of data||[]){
+        const order=ordersById.get(row.id);
+        if(order)order.commissionSettlement=row.commission_settlement_status;
+        savedCount++;
+      }
+    }
+    if(savedCount===ids.length)toast(`已将 ${savedCount} 笔设为「${state}」`);
+    else toast(`仅保存了 ${savedCount}/${ids.length} 笔，请刷新后核对`);
+  }catch(err){
+    if(current?.id===ownerId)toast(`已保存 ${savedCount}/${ids.length} 笔，更新失败：${errText(err)}`);
+  }finally{
+    commissionSettlementSaving=false;
+    if(current?.id===ownerId)renderCommission();
+  }
 }
 
 function commissionNameText(value){
@@ -601,16 +712,80 @@ function updateCommissionPreview(){
   commissionCopy.disabled=!name||commissionSave.disabled;
 }
 
-$('#commissionCards').addEventListener('click',event=>{
-  const button=event.target.closest('[data-commission-order]');
-  if(!button)return;
-  const order=mine().find(item=>item.id===button.dataset.commissionOrder);
-  if(!order)return;
+
+function openCommissionEditor(order){
   commissionEditor.dataset.orderId=order.id;
   commissionName.value=order.commissionName||'';
   updateCommissionPreview();
   commissionEditor.showModal();
+}
+
+async function copyCommissionOrders(orders){
+  if(!orders.length)return;
+  const unnamed=orders.filter(order=>!commissionNameText(order.commissionName||''));
+  if(unnamed.length){
+    if(orders.length===1){
+      openCommissionEditor(orders[0]);
+      commissionFeedback.textContent='请先填写客户归属';
+    }else{
+      toast(`所选订单有 ${unnamed.length} 笔未填写客户归属，请先编辑名字`);
+    }
+    return;
+  }
+
+  const text=orders.map(order=>buildCommissionText(order,commissionNameText(order.commissionName)))
+    .join('\n\n');
+  try{
+    await navigator.clipboard.writeText(text);
+    toast(orders.length===1?'文案已复制':`已复制 ${orders.length} 笔提成文案`);
+  }catch{
+    const dialog=$('#commissionCopyFallback');
+    const field=$('#commissionCopyFallbackText');
+    field.value=text;
+    dialog.showModal();
+    field.focus();
+    field.select();
+  }
+}
+
+$('#commissionCards').addEventListener('click',event=>{
+  const button=event.target.closest('[data-commission-order],[data-commission-copy]');
+  if(!button)return;
+  const order=mine().find(item=>item.id===(button.dataset.commissionOrder||button.dataset.commissionCopy));
+  if(!order||order.paid!=='是')return;
+  if(button.dataset.commissionOrder)openCommissionEditor(order);
+  else copyCommissionOrders([order]);
 });
+
+$('#commissionCards').addEventListener('change',event=>{
+  const control=event.target;
+  if(control.dataset.commissionSelect){
+    const id=control.dataset.commissionSelect;
+    if(control.checked)commissionSelectedIds.add(id);
+    else commissionSelectedIds.delete(id);
+    updateCommissionSelection();
+  }else if(control.dataset.settlementOrder){
+    setCommissionSettlement([control.dataset.settlementOrder],control.value);
+  }
+});
+
+$('#commissionSelectAll').addEventListener('change',event=>{
+  commissionSelectedIds.clear();
+  const checked=event.target.checked;
+  $$('#commissionCards [data-commission-select]').forEach(input=>{
+    input.checked=checked;
+    if(checked)commissionSelectedIds.add(input.dataset.commissionSelect);
+  });
+  updateCommissionSelection();
+});
+
+$('#commissionBulkCopy').addEventListener('click',()=>copyCommissionOrders(getSelectedCommissionOrders()));
+$('#commissionBulkSettlement').addEventListener('change',event=>{
+  const state=event.target.value;
+  event.target.value='';
+  setCommissionSettlement(getSelectedCommissionOrders().map(order=>order.id),state);
+});
+$('#closeCommissionCopyFallback').addEventListener('click',()=>$('#commissionCopyFallback').close());
 
 commissionName.addEventListener('input',updateCommissionPreview);
 commissionCancel.addEventListener('click',()=>commissionEditor.close());

@@ -1,5 +1,7 @@
 project_id = "mjqeoapqufqnghzaqkqq"
 
+[remotes.production]
+project_id = "mjqeoapqufqnghzaqkqq"
+
 [functions.manage-staff]
 verify_jwt = true
-

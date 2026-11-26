@@ -18,8 +18,12 @@ Deno.serve(async (req: Request) => {
   if (req.method !== "POST") return reply(405, { error: "Method not allowed" });
 
   const url = Deno.env.get("SUPABASE_URL");
-  const publicKey = Deno.env.get("SUPABASE_ANON_KEY") ?? Deno.env.get("SUPABASE_PUBLISHABLE_KEY");
-  const adminKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? Deno.env.get("SUPABASE_SECRET_KEY");
+  const publicKey = Deno.env.get("SUPABASE_ANON_KEY")
+    ?? Deno.env.get("SUPABASE_PUBLISHABLE_KEY")
+    ?? JSON.parse(Deno.env.get("SUPABASE_PUBLISHABLE_KEYS") ?? "{}")?.default;
+  const adminKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
+    ?? Deno.env.get("SUPABASE_SECRET_KEY")
+    ?? JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS") ?? "{}")?.default;
   const authHeader = req.headers.get("Authorization");
   if (!url || !publicKey || !adminKey || !authHeader) return reply(500, { error: "Server configuration is incomplete" });
 

@@ -59,7 +59,7 @@ Deno.serve(async (req: Request) => {
   if (body.action === "delete") {
     const userId = body.user_id ?? "";
     if (!/^[0-9a-f-]{36}$/i.test(userId)) return reply(400, { error: "Invalid user ID" });
-    const { data: target, error: targetError } = await admin.from("profiles").select("role").eq("id", userId).maybeSingle();
+    const { data: target, error: targetError } = await caller.from("profiles").select("role").eq("id", userId).maybeSingle();
     if (targetError) return reply(400, { error: targetError.message });
     if (!target || target.role === "admin") return reply(400, { error: "This account cannot be deleted here" });
     const { error } = await admin.auth.admin.deleteUser(userId);

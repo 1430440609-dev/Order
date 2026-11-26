@@ -253,6 +253,7 @@ main{min-width:0;max-width:100%;}
   gap:14px;
 }
 .commission-card{display:grid;gap:15px;padding:16px;min-width:0}
+.commission-card.is-settled{background:#edf9f0}
 .commission-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
 .commission-card h2{font-size:15px;margin:1px 0 0;overflow-wrap:anywhere}
 .commission-card .btn{flex:none;padding:5px 11px;font-size:12px}
@@ -676,7 +677,7 @@ function renderCommission(){
   const start=(commissionPage-1)*COMMISSION_PAGE_SIZE;
   const pageOrders=visibleOrders.slice(start,start+COMMISSION_PAGE_SIZE);
   const cards=pageOrders.map(order=>`
-    <article class="panel commission-card">
+    <article class="panel commission-card${order.commissionSettlement==='已结款'?' is-settled':''}">
       <div class="commission-card-head">
         <h2>${esc(order.hotel||'未填写酒店')}${order.name?`<span class="commission-guest-name">${esc(order.name)}</span>`:''}</h2>
         <label class="commission-select-order">

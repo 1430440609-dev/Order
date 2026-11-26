@@ -205,6 +205,8 @@ main{min-width:0;max-width:100%;}
 }
 @media(max-width:760px){.order-toolbar{padding:10px 12px}}
 .checkin-due{color:#ba2525;font-weight:700}
+#ordersView .table-wrap tr.order-located > td{background:#eaf2ff;border-bottom:1px solid #8db3ff;border-top:1px solid #8db3ff}
+#ordersView .table-wrap tr.order-located > td:first-child{box-shadow:inset 3px 0 var(--blue)}
 </style></head>
 <body>
 <div id="loginPage" class="login"><div class="login-card"><div class="brand"><div class="mark">单</div><span>订单 <span style="color:#9ba8be;font-weight:500">ORDER DESK</span></span></div><h1>欢迎回来</h1><p class="sub">登录酒店订单管理工作台</p><form id="loginForm"><label class="field">账号<input id="loginUser" autocomplete="username" placeholder="请输入账号" required></label><label class="field">密码<input id="loginPass" type="password" autocomplete="current-password" placeholder="请输入密码" required></label><div id="loginError" style="color:#d45e5e;font-size:12px;min-height:18px"></div><button class="btn primary wide">登录工作台</button></form></div></div>
@@ -281,7 +283,7 @@ function upcomingCheckins(orders,window){
 function renderDashboard(list=mine()){
   $('#statTotal').textContent=list.length;$('#statOk').textContent=list.filter(o=>o.status==='是').length;$('#statWait').textContent=list.filter(o=>o.status==='待定').length;$('#statProfit').textContent=money(list.reduce((a,o)=>a+(+o.profit||0),0));renderChart(list);
   const dueWindow=checkinWindow();
-  $('#recentBody').innerHTML=upcomingCheckins(list,dueWindow).map(o=>'<tr><td class="order-no">'+esc(o.no)+'</td><td>'+esc(o.name)+'</td><td>'+esc(o.hotel)+'</td><td>'+checkinDateText(o,dueWindow)+'</td><td>'+(o.nights||0)+' 晚</td><td>'+money(o.quote)+'</td><td class="profit">'+money(o.profit)+'</td><td>'+statusPill(o.status)+'</td><td><button class="linkbtn" onclick="editOrder(\''+o.id+'\')">编辑</button></td></tr>').join('')
+  $('#recentBody').innerHTML=upcomingCheckins(list,dueWindow).map(o=>'<tr><td class="order-no">'+esc(o.no)+'</td><td>'+esc(o.name)+'</td><td>'+esc(o.hotel)+'</td><td>'+checkinDateText(o,dueWindow)+'</td><td>'+(o.nights||0)+' 晚</td><td>'+money(o.quote)+'</td><td class="profit">'+money(o.profit)+'</td><td>'+statusPill(o.status)+'</td><td><button type="button" class="linkbtn" data-locate-order="'+esc(o.id)+'" aria-label="跳转到订单管理并定位">跳转</button></td></tr>').join('')
     ||emptyRow(9,'未来 7 天没有待入住订单');
   labelCells($('#recentBody'),['确认号','姓名','酒店','入住日期','入住晚数','报价','利润','入住状态','操作']);
 }
@@ -304,9 +306,7 @@ function closeDatePicker(restoreFocus=false){
   if(restoreFocus)button.focus({preventScroll:true});
 }
 
-function applyDateFilter(value,mode){
-  const button=activeDatePicker;
-  if(!button)return;
+function setDateFilterValue(button,value,mode){
   button.dataset.value=value;
   button.dataset.mode=mode;
   const label=button.previousElementSibling.textContent;
@@ -314,6 +314,11 @@ function applyDateFilter(value,mode){
   button.textContent=displayValue||'请选择';
   button.setAttribute('aria-label',label+'筛选，'+(displayValue||'未选择'));
   button.classList.toggle('has-value',Boolean(value));
+}
+
+function applyDateFilter(value,mode){
+  if(!activeDatePicker)return;
+  setDateFilterValue(activeDatePicker,value,mode);
   closeDatePicker(true);
   currentPage=1;
   renderOrders();
@@ -381,9 +386,14 @@ function matchesOrderCategory(category){
     || (activeCategory==='真实订单' && REAL_ORDER_TYPES.has(category));
 }
 
+function filteredOrders(){
+  const q=$('#searchInput').value.toLowerCase(),st=$('#statusFilter').value,pf=$('#placedFilter').dataset.value||'',cf=$('#checkinFilter').dataset.value||'',xf=$('#checkoutFilter').dataset.value||'',pm=$('#placedFilter').dataset.mode||'day',cm=$('#checkinFilter').dataset.mode||'day',xm=$('#checkoutFilter').dataset.mode||'day',paidf=$('#paidFilter').value,catf=$('#categoryFilter').value,payf=$('#paymentFilter').value;const dateMatch=(actual,value,mode)=>!value||(mode==='month'?String(actual||'').slice(0,7)===value:String(actual||'').slice(0,10)===value);return mine().filter(o=>matchesOrderCategory(o.category)&&(!st||o.status===st)&&dateMatch(o.placed,pf,pm)&&dateMatch(o.checkin,cf,cm)&&dateMatch(o.checkout,xf,xm)&&(!paidf||o.paid===paidf)&&(!catf||(o.category||'')===catf)&&(!payf||normalizePaymentMethod(o.payment)===payf)&&(!q||[o.no,o.name,o.hotel,o.company].join(' ').toLowerCase().includes(q))).sort((a,b)=>(b.created||'').localeCompare(a.created||''));
+}
+
 function renderOrders(){
-const dueWindow=checkinWindow();
-const q=$('#searchInput').value.toLowerCase(),st=$('#statusFilter').value,pf=$('#placedFilter').dataset.value||'',cf=$('#checkinFilter').dataset.value||'',xf=$('#checkoutFilter').dataset.value||'',pm=$('#placedFilter').dataset.mode||'day',cm=$('#checkinFilter').dataset.mode||'day',xm=$('#checkoutFilter').dataset.mode||'day',paidf=$('#paidFilter').value,catf=$('#categoryFilter').value,payf=$('#paymentFilter').value;const dateMatch=(actual,value,mode)=>!value||(mode==='month'?String(actual||'').slice(0,7)===value:String(actual||'').slice(0,10)===value);const list=mine().filter(o=>matchesOrderCategory(o.category)&&(!st||o.status===st)&&dateMatch(o.placed,pf,pm)&&dateMatch(o.checkin,cf,cm)&&dateMatch(o.checkout,xf,xm)&&(!paidf||o.paid===paidf)&&(!catf||(o.category||'')===catf)&&(!payf||normalizePaymentMethod(o.payment)===payf)&&(!q||[o.no,o.name,o.hotel,o.company].join(' ').toLowerCase().includes(q))).sort((a,b)=>(b.created||'').localeCompare(a.created||''));$('#countLabel').textContent=`共 ${list.length} 笔订单`;const pageCount=Math.max(1,Math.ceil(list.length/pageSize));currentPage=Math.min(Math.max(1,currentPage),pageCount);const start=(currentPage-1)*pageSize,pageRows=list.slice(start,start+pageSize);$('#orderBody').innerHTML=pageRows.map(o=>`<tr><td class="selection-col"><input class="row-select" type="checkbox" value="${o.id}" aria-label="选择订单" ${selectedOrderIds.has(o.id)?'checked':''} onchange="toggleOrderSelection('${o.id}',this.checked)"></td><td><input class="table-edit" value="${esc(o.no)}" placeholder="填写确认号" onchange="updateOrderField('${o.id}','no',this.value)"></td><td><input class="table-edit" value="${esc(o.company)}" placeholder="填写协议公司" onchange="updateOrderField('${o.id}','company',this.value)"></td><td>${esc(o.hotel)}</td><td>${esc(o.name)}</td><td>${checkinDateText(o,dueWindow)}</td><td>${esc(o.checkout)}</td><td>${o.nights||0}</td><td class="money">${money(o.cost)}</td><td class="money">${money(o.quote)}</td><td class="profit">${money(o.profit)}</td><td><input class="table-edit deposit-edit" type="number" min="0" step="0.01" value="${esc(o.deposit)}" onchange="confirmDepositChange('${o.id}',this)"></td><td>${money(o.balance)}</td><td><select class="table-select" onchange="updateOrderField('${o.id}','paid',this.value)"><option ${o.paid==='是'?'selected':''}>是</option><option ${o.paid==='否'?'selected':''}>否</option><option ${(!o.paid||o.paid==='待定')?'selected':''}>待定</option></select></td><td><select class="table-select" onchange="updateOrderField('${o.id}','status',this.value)"><option ${o.status==='是'?'selected':''}>是</option><option ${o.status==='否'?'selected':''}>否</option><option ${(!o.status||o.status==='待定')?'selected':''}>待定</option></select></td><td><select class="table-select" onchange="updateOrderField('${o.id}','category',this.value)"><option value="" ${!o.category?'selected':''}>全部订单</option><option ${o.category==='协议价'?'selected':''}>协议价</option><option ${o.category==='FHR'?'selected':''}>FHR</option><option ${o.category==='GDS'?'selected':''}>GDS</option><option ${o.category==='积分房'?'selected':''}>积分房</option><option ${o.category==='同住人'?'selected':''}>同住人</option><option ${o.category==='房卡房'?'selected':''}>房卡房</option><option ${o.category==='假单'?'selected':''}>假单</option><option ${o.category==='转推单'?'selected':''}>转推单</option><option ${o.category==='取消单'?'selected':''}>取消单</option></select></td><td><select class="table-select payment-select" aria-label="付款方式" onchange="updateOrderPayment('${o.id}',this)">${paymentMethodOptions(o.payment)}</select></td><td title="${esc(o.note)}">${esc((o.note||'').slice(0,16))}</td><td>${esc(o.placed)}</td><td><div class="actions"><button class="linkbtn" onclick="editOrder('${o.id}')">编辑</button><button class="linkbtn del" onclick="deleteOrder('${o.id}')">删除</button></div></td></tr>`).join('')||emptyRow(20,'没有匹配的订单');labelCells($('#orderBody'),['选择','确认号','协议公司','酒店','姓名','入住日期','离店日期','晚数','成本','报价','利润','定金','尾款','回款','入住状态','订单类型','付款方式','备注','下单时间','操作']);for(const id of [...selectedOrderIds])if(!orders.some(o=>o.id===id))selectedOrderIds.delete(id);const selectedOnPage=pageRows.filter(o=>selectedOrderIds.has(o.id)).length,selectAll=$('#selectAllOrders');selectAll.checked=pageRows.length>0&&selectedOnPage===pageRows.length;selectAll.indeterminate=selectedOnPage>0&&selectedOnPage<pageRows.length;const batchDeleteButton=$('#batchDeleteBtn');batchDeleteButton.title=selectedOrderIds.size?`删除选中的 ${selectedOrderIds.size} 笔订单`:'删除选中的订单';batchDeleteButton.disabled=selectedOrderIds.size===0;$('#pageInfo').textContent=list.length?`第 ${currentPage} / ${pageCount} 页`:'第 0 / 0 页';$('#prevPage').disabled=currentPage<=1;$('#nextPage').disabled=currentPage>=pageCount}
+  const dueWindow=checkinWindow();
+  const list=filteredOrders();
+  $('#countLabel').textContent=`共 ${list.length} 笔订单`;const pageCount=Math.max(1,Math.ceil(list.length/pageSize));currentPage=Math.min(Math.max(1,currentPage),pageCount);const start=(currentPage-1)*pageSize,pageRows=list.slice(start,start+pageSize);$('#orderBody').innerHTML=pageRows.map(o=>`<tr id="order-row-${esc(o.id)}"><td class="selection-col"><input class="row-select" type="checkbox" value="${o.id}" aria-label="选择订单" ${selectedOrderIds.has(o.id)?'checked':''} onchange="toggleOrderSelection('${o.id}',this.checked)"></td><td><input class="table-edit" value="${esc(o.no)}" placeholder="填写确认号" onchange="updateOrderField('${o.id}','no',this.value)"></td><td><input class="table-edit" value="${esc(o.company)}" placeholder="填写协议公司" onchange="updateOrderField('${o.id}','company',this.value)"></td><td>${esc(o.hotel)}</td><td>${esc(o.name)}</td><td>${checkinDateText(o,dueWindow)}</td><td>${esc(o.checkout)}</td><td>${o.nights||0}</td><td class="money">${money(o.cost)}</td><td class="money">${money(o.quote)}</td><td class="profit">${money(o.profit)}</td><td><input class="table-edit deposit-edit" type="number" min="0" step="0.01" value="${esc(o.deposit)}" onchange="confirmDepositChange('${o.id}',this)"></td><td>${money(o.balance)}</td><td><select class="table-select" onchange="updateOrderField('${o.id}','paid',this.value)"><option ${o.paid==='是'?'selected':''}>是</option><option ${o.paid==='否'?'selected':''}>否</option><option ${(!o.paid||o.paid==='待定')?'selected':''}>待定</option></select></td><td><select class="table-select" onchange="updateOrderField('${o.id}','status',this.value)"><option ${o.status==='是'?'selected':''}>是</option><option ${o.status==='否'?'selected':''}>否</option><option ${(!o.status||o.status==='待定')?'selected':''}>待定</option></select></td><td><select class="table-select" onchange="updateOrderField('${o.id}','category',this.value)"><option value="" ${!o.category?'selected':''}>全部订单</option><option ${o.category==='协议价'?'selected':''}>协议价</option><option ${o.category==='FHR'?'selected':''}>FHR</option><option ${o.category==='GDS'?'selected':''}>GDS</option><option ${o.category==='积分房'?'selected':''}>积分房</option><option ${o.category==='同住人'?'selected':''}>同住人</option><option ${o.category==='房卡房'?'selected':''}>房卡房</option><option ${o.category==='假单'?'selected':''}>假单</option><option ${o.category==='转推单'?'selected':''}>转推单</option><option ${o.category==='取消单'?'selected':''}>取消单</option></select></td><td><select class="table-select payment-select" aria-label="付款方式" onchange="updateOrderPayment('${o.id}',this)">${paymentMethodOptions(o.payment)}</select></td><td title="${esc(o.note)}">${esc((o.note||'').slice(0,16))}</td><td>${esc(o.placed)}</td><td><div class="actions"><button class="linkbtn" onclick="editOrder('${o.id}')">编辑</button><button class="linkbtn del" onclick="deleteOrder('${o.id}')">删除</button></div></td></tr>`).join('')||emptyRow(20,'没有匹配的订单');labelCells($('#orderBody'),['选择','确认号','协议公司','酒店','姓名','入住日期','离店日期','晚数','成本','报价','利润','定金','尾款','回款','入住状态','订单类型','付款方式','备注','下单时间','操作']);for(const id of [...selectedOrderIds])if(!orders.some(o=>o.id===id))selectedOrderIds.delete(id);const selectedOnPage=pageRows.filter(o=>selectedOrderIds.has(o.id)).length,selectAll=$('#selectAllOrders');selectAll.checked=pageRows.length>0&&selectedOnPage===pageRows.length;selectAll.indeterminate=selectedOnPage>0&&selectedOnPage<pageRows.length;const batchDeleteButton=$('#batchDeleteBtn');batchDeleteButton.title=selectedOrderIds.size?`删除选中的 ${selectedOrderIds.size} 笔订单`:'删除选中的订单';batchDeleteButton.disabled=selectedOrderIds.size===0;$('#pageInfo').textContent=list.length?`第 ${currentPage} / ${pageCount} 页`:'第 0 / 0 页';$('#prevPage').disabled=currentPage<=1;$('#nextPage').disabled=currentPage>=pageCount}
 window.toggleOrderSelection=(id,checked)=>{if(checked)selectedOrderIds.add(id);else selectedOrderIds.delete(id);renderOrders()};
 $('#selectAllOrders').onchange=e=>{$$('#orderBody .row-select').forEach(box=>{if(e.target.checked)selectedOrderIds.add(box.value);else selectedOrderIds.delete(box.value)});renderOrders()};
 $('#pageSizeSelect').onchange=e=>{pageSize=Number(e.target.value)||10;currentPage=1;renderOrders()};
@@ -391,7 +401,56 @@ $('#prevPage').onclick=()=>{if(currentPage>1){currentPage--;renderOrders()}};
 $('#nextPage').onclick=()=>{currentPage++;renderOrders()};
 $('#batchDeleteBtn').onclick=async()=>{const ids=[...selectedOrderIds].filter(id=>orders.some(o=>o.id===id));if(!ids.length){selectedOrderIds.clear();renderOrders();return}if(!confirm(`确定批量删除选中的 ${ids.length} 笔订单吗？此操作无法撤销。`))return;const btn=$('#batchDeleteBtn');btn.disabled=true;let deleted=0;try{for(let i=0;i<ids.length;i+=50){const batch=ids.slice(i,i+50),{data,error}=await sb.from('orders').delete().in('id',batch).select('id');if(error)throw error;const gone=(data||[]).map(x=>x.id);deleted+=gone.length;gone.forEach(id=>selectedOrderIds.delete(id));if(gone.length!==batch.length)throw new Error('只确认删除 '+gone.length+'/'+batch.length+' 笔，部分订单未删除')}await loadOrders();currentPage=1;render();toast(`已从云端删除 ${deleted} 笔订单`)}catch(err){await loadOrders();render();toast(`批量删除中断，已删除 ${deleted} 笔：${errText(err)}`)}finally{btn.disabled=selectedOrderIds.size===0}};
 function renderChart(list){const now=new Date(),months=[];for(let i=5;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth()-i,1);months.push({key:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`,label:`${d.getMonth()+1}月`,n:0})}list.forEach(o=>{const m=months.find(x=>x.key===(o.placed||'').slice(0,7));if(m)m.n++});const max=Math.max(1,...months.map(x=>x.n)),pts=months.map((m,i)=>`${30+i*108},${126-(m.n/max)*94}`).join(' ');$('#linePath').setAttribute('d','M'+pts.replaceAll(' ',',') );$('#areaPath').setAttribute('d',`M30,130 L${pts.replaceAll(' ',',')} L570,130 Z`);$('#chartLabels').innerHTML=months.map((m,i)=>`<text x="${30+i*108}" y="148" font-size="10" fill="#99a4b4" text-anchor="middle">${m.label}</text>`).join('');const counts=['是','待定','否'].map(s=>list.filter(o=>(o.status||'待定')===s).length),mx=Math.max(1,...counts);$('#statusBars').innerHTML=['是','待定','否'].map((s,i)=>`<div class="bar-group"><div class="bar" style="height:${Math.max(6,counts[i]/mx*100)}%"></div><div class="bar alt" style="height:${Math.max(6,(counts[(i+1)%3]||0)/mx*85)}%"></div><span class="bar-label">${s} · ${counts[i]}</span></div>`).join('')}
-function nav(view){$$('.nav[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===view));['dashboard','orders','staff'].forEach(v=>$('#'+v+'View').classList.toggle('hidden',v!==view));if(view==='orders')renderOrders();if(view==='dashboard')renderDashboard()};$$('.subnav-item').forEach(b=>b.onclick=()=>{activeCategory=b.dataset.category;currentPage=1;$$('.subnav-item').forEach(x=>x.classList.toggle('active',x===b));nav('orders')});$$('.nav[data-view]').forEach(b=>b.onclick=()=>nav(b.dataset.view));$('#allOrders').onclick=()=>nav('orders');$('#quickAdd').onclick=$('#addOrder').onclick=()=>showOrder();$('#searchInput').oninput=()=>{currentPage=1;renderOrders()};
+function selectOrderCategory(category){
+  activeCategory=category;
+  currentPage=1;
+  $$('#orderSubnav .subnav-item').forEach(button=>{
+    button.classList.toggle('active',button.dataset.category===category);
+  });
+}
+
+function clearOrderFilters(){
+  $('#searchInput').value='';
+  $$('#ordersView .order-status-filters select').forEach(select=>{select.value='';});
+  $$('#ordersView .date-filter').forEach(button=>setDateFilterValue(button,'','day'));
+}
+
+function locateOrder(id){
+  if(!mine().some(order=>order.id===id)){
+    toast('订单已不在当前列表');
+    return;
+  }
+
+  let index=filteredOrders().findIndex(order=>order.id===id);
+  if(index<0){
+    selectOrderCategory('全部');
+    index=filteredOrders().findIndex(order=>order.id===id);
+    if(index<0){
+      clearOrderFilters();
+      index=filteredOrders().findIndex(order=>order.id===id);
+    }
+  }
+
+  currentPage=Math.floor(index/pageSize)+1;
+  nav('orders');
+  const row=document.getElementById('order-row-'+id);
+  if(!row)return;
+  $('#ordersView .table-wrap').scrollLeft=0;
+  row.classList.add('order-located');
+  row.tabIndex=-1;
+  row.focus({preventScroll:true});
+  row.scrollIntoView({block:'center',inline:'nearest'});
+}
+
+$('#recentBody').addEventListener('click',event=>{
+  const action=event.target.closest('[data-locate-order]');
+  if(action)locateOrder(action.dataset.locateOrder);
+});
+function nav(view){$$('.nav[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===view));['dashboard','orders','staff'].forEach(v=>$('#'+v+'View').classList.toggle('hidden',v!==view));if(view==='orders')renderOrders();if(view==='dashboard')renderDashboard()};
+$$('#orderSubnav .subnav-item').forEach(button=>{
+  button.onclick=()=>{selectOrderCategory(button.dataset.category);nav('orders');};
+});
+$$('.nav[data-view]').forEach(b=>b.onclick=()=>nav(b.dataset.view));$('#allOrders').onclick=()=>nav('orders');$('#quickAdd').onclick=$('#addOrder').onclick=()=>showOrder();$('#searchInput').oninput=()=>{currentPage=1;renderOrders()};
 $$('#statusFilter,#paidFilter,#categoryFilter,#paymentFilter').forEach(filter=>{
   filter.addEventListener('change',()=>{currentPage=1;renderOrders()});
 });

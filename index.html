@@ -277,6 +277,17 @@ main{min-width:0;max-width:100%;}
 .commission-feedback:empty{display:none}
 .commission-dialog .modal-actions{flex-wrap:wrap}
 
+#commissionView > .page-head{flex-wrap:wrap;gap:10px}
+.commission-profit-total:not(:empty){
+  margin:0;
+  padding:6px 12px;
+  border-radius:999px;
+  background:#e8f8f1;
+  color:#086449;
+  font-weight:700;
+  font-variant-numeric:tabular-nums;
+}
+.commission-profit-total:empty{margin:0}
 .commission-toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:9px 13px;padding:11px 14px;margin-bottom:12px}
 .commission-select-all{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 .commission-select-all input,.commission-select-order input{width:16px;height:16px;accent-color:var(--blue)}
@@ -293,6 +304,31 @@ main{min-width:0;max-width:100%;}
 @media(max-width:450px){
   .commission-bulk-actions{width:100%;margin-inline-start:0}
 }
+
+.commission-toolbar{scroll-margin-top:82px}
+.commission-name-form{
+  flex:1 0 100%;
+  display:flex;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:7px;
+  padding-bottom:9px;
+  border-bottom:1px solid var(--line);
+}
+.commission-name-form label{color:#52617a;font-weight:600;font-size:12px;white-space:nowrap}
+.commission-name-form input{
+  flex:1 1 130px;
+  max-width:220px;
+  min-width:0;
+  min-height:32px;
+  padding:5px 9px;
+}
+.commission-name-form .btn{min-height:32px;padding:5px 9px;font-size:12px}
+.commission-name-status{font-size:12px;color:#66748a}
+.commission-name-status:empty{display:none}
+.commission-pagination{display:flex;justify-content:center;align-items:center;gap:9px;margin-top:14px;color:#66748a;font-size:12px}
+.commission-guest-name{margin-inline-start:7px;color:#6b7280;font-size:11px;font-weight:400}
+@media(max-width:760px){.commission-toolbar{scroll-margin-top:126px}}
 </style></head>
 <body>
 <div id="loginPage" class="login"><div class="login-card"><div class="brand"><div class="mark">单</div><span>订单 <span style="color:#9ba8be;font-weight:500">ORDER DESK</span></span></div><h1>欢迎回来</h1><p class="sub">登录酒店订单管理工作台</p><form id="loginForm"><label class="field">账号<input id="loginUser" autocomplete="username" placeholder="请输入账号" required></label><label class="field">密码<input id="loginPass" type="password" autocomplete="current-password" placeholder="请输入密码" required></label><div id="loginError" style="color:#d45e5e;font-size:12px;min-height:18px"></div><button class="btn primary wide">登录工作台</button></form></div></div>
@@ -322,8 +358,15 @@ main{min-width:0;max-width:100%;}
 <section id="commissionView" class="hidden">
   <div class="page-head">
     <div><h1>我要提提成</h1><div class="crumb">工作台　/　我要提提成</div></div>
+    <p id="commissionProfitTotal" class="commission-profit-total" aria-live="polite" aria-atomic="true"></p>
   </div>
-  <div class="panel commission-toolbar">
+  <div class="panel commission-toolbar" id="commissionToolbar">
+    <form id="commissionSharedNameForm" class="commission-name-form">
+      <label for="commissionSharedName">客户归属</label>
+      <input class="filter" id="commissionSharedName" maxlength="80" autocomplete="off" placeholder="例如黄运宝" disabled>
+      <button type="submit" class="btn" id="applyCommissionSharedName" disabled>应用</button>
+      <span id="commissionSharedNameStatus" class="commission-name-status" role="status"></span>
+    </form>
     <label class="commission-select-all"><input type="checkbox" id="commissionSelectAll">全选</label>
     <span id="commissionSelectedCount" aria-live="polite">已选 0 笔</span>
     <div class="commission-bulk-actions">
@@ -336,25 +379,24 @@ main{min-width:0;max-width:100%;}
     </div>
   </div>
   <div id="commissionCards" class="commission-grid"></div>
+  <div class="commission-pagination hidden" id="commissionPagination">
+    <button type="button" class="page-button" id="commissionPrevPage">上一页</button>
+    <span id="commissionPageInfo" aria-live="polite"></span>
+    <button type="button" class="page-button" id="commissionNextPage">下一页</button>
+  </div>
 </section>
 <section id="staffView" class="hidden"><div class="page-head"><div><h1>员工账号</h1><div class="crumb">系统设置　/　员工管理</div></div></div><div class="panel admin-box"><div class="panel-head" style="padding:20px 22px 0"><h3>添加员工</h3><span class="small-note">员工订单与其他账号隔离</span></div><form id="addStaffForm" class="admin-add"><input id="newStaffUser" placeholder="登录账号" required><input id="newStaffPass" type="password" minlength="8" placeholder="初始密码（至少 8 位）" required><button class="btn primary">添加账号</button></form><div class="admin-list" id="staffList"></div></div><div class="panel admin-box" style="margin-top:16px;padding:20px 22px"><div class="panel-head"><h3>全局页面设置</h3><span class="small-note">保存后所有账号同步生效</span></div><form id="settingsForm" style="display:flex;gap:10px;align-items:end;flex-wrap:wrap"><label class="field" style="flex:1;min-width:220px;margin:0">页面标题<input id="settingsTitle" maxlength="80" required></label><button class="btn primary">保存设置</button></form></div></section></main></div></div>
 
 <dialog id="commissionEditor" class="commission-dialog" aria-labelledby="commissionTitle">
-  <div class="modal-head">
-    <div class="modal-title"><h2 id="commissionTitle">编辑提成文案</h2></div>
+  <div class="modal-head"><div class="modal-title"><h2 id="commissionTitle">提成文案</h2></div></div>
+  <div class="commission-dialog-body">
+    <label class="field">提成文案<textarea id="commissionText" readonly></textarea></label>
+    <p id="commissionFeedback" class="commission-feedback" role="status"></p>
   </div>
-  <form id="commissionForm">
-    <div class="commission-dialog-body">
-      <label class="field">客户归属<input id="commissionName" maxlength="80" placeholder="输入名字，例如黄运宝" autofocus></label>
-      <label class="field">提成文案<textarea id="commissionText" readonly></textarea></label>
-      <p id="commissionFeedback" class="commission-feedback" role="status"></p>
-    </div>
-    <div class="modal-actions">
-      <button type="button" class="btn" id="cancelCommission">取消</button>
-      <button type="button" class="btn" id="copyCommission">复制文案</button>
-      <button type="submit" class="btn primary" id="saveCommission">保存名字</button>
-    </div>
-  </form>
+  <div class="modal-actions">
+    <button type="button" class="btn" id="cancelCommission">关闭</button>
+    <button type="button" class="btn primary" id="copyCommission">复制文案</button>
+  </div>
 </dialog>
 
 <dialog id="commissionCopyFallback" class="commission-dialog" aria-labelledby="commissionCopyFallbackTitle">
@@ -380,9 +422,9 @@ function toDbOrder(o){return {id:o.id,owner_id:current.id,confirmation_no:o.no||
 async function saveOrder(o){const {error}=await sb.from('orders').upsert(toDbOrder(o));if(error)throw error;await loadOrders()}
 async function loadSettings(){const {data,error}=await sb.from('app_settings').select('value').eq('key','site').maybeSingle();if(error)throw error;if(data?.value)sharedSettings={...sharedSettings,...data.value};document.title=sharedSettings.title||'住单 · 酒店订单管理';if($('#settingsTitle'))$('#settingsTitle').value=sharedSettings.title||'住单 · 酒店订单管理'}
 async function init(){const {data,error}=await sb.auth.getSession();if(error)console.error(error);if(data.session)await openApp(data.session.user)}
-async function openApp(authUser){const {data:profile,error}=await withTimeout(sb.from('profiles').select('id,username,role').eq('id',authUser.id).single(),15000,'云端连接超时，请检查当前电脑的网络后重试');if(error){$('#loginError').textContent='账号资料读取失败：'+errText(error);await sb.auth.signOut();return}current={...profile,email:authUser.email};$('#loginPage').classList.add('hidden');$('#app').classList.remove('hidden');$('#who').textContent=current.username;$('#avatar').textContent=current.username.slice(0,1).toUpperCase();$('#roleBadge').textContent=current.role==='admin'?'管理员':'员工';$('#adminNav').classList.toggle('hidden',current.role!=='admin');try{await Promise.all([loadOrders(),loadSettings()]);render();toast('云端数据已加载')}catch(e){toast('读取云端数据失败：'+errText(e))}}
+async function openApp(authUser){const {data:profile,error}=await withTimeout(sb.from('profiles').select('id,username,role').eq('id',authUser.id).single(),15000,'云端连接超时，请检查当前电脑的网络后重试');if(error){$('#loginError').textContent='账号资料读取失败：'+errText(error);await sb.auth.signOut();return}current={...profile,email:authUser.email};loadCommissionPreference();$('#loginPage').classList.add('hidden');$('#app').classList.remove('hidden');$('#who').textContent=current.username;$('#avatar').textContent=current.username.slice(0,1).toUpperCase();$('#roleBadge').textContent=current.role==='admin'?'管理员':'员工';$('#adminNav').classList.toggle('hidden',current.role!=='admin');try{await Promise.all([loadOrders(),loadSettings()]);render();toast('云端数据已加载')}catch(e){toast('读取云端数据失败：'+errText(e))}}
 $('#loginForm').onsubmit=async e=>{e.preventDefault();const username=$('#loginUser').value.trim().toLowerCase(),password=$('#loginPass').value,button=$('#loginForm button');button.disabled=true;button.textContent='正在连接云端…';$('#loginError').textContent='';try{const {data,error}=await withTimeout(sb.auth.signInWithPassword({email:username+'@orders.example.com',password}),15000,'云端登录连接超时，请检查当前电脑网络是否能访问 Supabase');if(error){$('#loginError').textContent=/invalid login credentials/i.test(error.message)?'账号或密码错误':'登录失败：'+errText(error);return}await openApp(data.user)}catch(err){$('#loginError').textContent=errText(err)}finally{button.disabled=false;button.textContent='登录工作台'}};
-$('#logoutBtn').onclick=async()=>{await sb.auth.signOut();current=null;orders=[];commissionSelectedIds.clear();$('#app').classList.add('hidden');$('#loginPage').classList.remove('hidden')};
+$('#logoutBtn').onclick=async()=>{await sb.auth.signOut();current=null;orders=[];commissionSelectedIds.clear();commissionPage=1;resetCommissionPreference();$('#app').classList.add('hidden');$('#loginPage').classList.remove('hidden')};
 function mine(){return orders}function esc(x=''){return String(x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}function money(n){return '¥'+(Number(n)||0).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2})}function statusPill(s){return '<span class="pill '+(s==='是'?'ok':s==='否'?'no':'wait')+'">'+esc(s||'待定')+'</span>'}
 function checkinWindow(now=new Date()){
   const parts=new Intl.DateTimeFormat('en-GB',{
@@ -586,13 +628,18 @@ function commissionOrders(orders){
 const COMMISSION_SETTLEMENT_STATES=['未结款','已结款'];
 const commissionSelectedIds=new Set();
 let commissionSettlementSaving=false;
+const COMMISSION_PAGE_SIZE=15;
+let commissionPage=1;
 
 function getSelectedCommissionOrders(){
   return commissionOrders(mine()).filter(order=>commissionSelectedIds.has(order.id));
 }
 
 function updateCommissionSelection(visibleOrders=commissionOrders(mine())){
-  const count=visibleOrders.filter(order=>commissionSelectedIds.has(order.id)).length;
+  const selected=visibleOrders.filter(order=>commissionSelectedIds.has(order.id));
+  const count=selected.length;
+  const totalCents=selected.reduce((sum,order)=>sum+Math.round((Number(order.profit)||0)*100),0);
+  $('#commissionProfitTotal').textContent=count?`牛逼了可以提(${money(totalCents/100)})`:'';
   const selectAll=$('#commissionSelectAll');
   selectAll.checked=count>0&&count===visibleOrders.length;
   selectAll.indeterminate=count>0&&count<visibleOrders.length;
@@ -608,10 +655,14 @@ function renderCommission(){
   for(const id of commissionSelectedIds){
     if(!visibleIds.has(id))commissionSelectedIds.delete(id);
   }
-  const cards=visibleOrders.map(order=>`
+  const pageCount=Math.ceil(visibleOrders.length/COMMISSION_PAGE_SIZE);
+  commissionPage=Math.min(Math.max(commissionPage,1),Math.max(pageCount,1));
+  const start=(commissionPage-1)*COMMISSION_PAGE_SIZE;
+  const pageOrders=visibleOrders.slice(start,start+COMMISSION_PAGE_SIZE);
+  const cards=pageOrders.map(order=>`
     <article class="panel commission-card">
       <div class="commission-card-head">
-        <h2>${esc(order.hotel||'未填写酒店')}</h2>
+        <h2>${esc(order.hotel||'未填写酒店')}${order.name?`<span class="commission-guest-name">${esc(order.name)}</span>`:''}</h2>
         <label class="commission-select-order">
           <input type="checkbox" data-commission-select="${esc(order.id)}"
             aria-label="选择${esc(order.hotel||'这笔订单')}" ${commissionSelectedIds.has(order.id)?'checked':''}>
@@ -629,11 +680,15 @@ function renderCommission(){
             <option${state===order.commissionSettlement?' selected':''}>${state}</option>`).join('')}
         </select>
         <button type="button" class="btn" data-commission-copy="${esc(order.id)}">复制</button>
-        <button type="button" class="btn" data-commission-order="${esc(order.id)}">编辑</button>
+        <button type="button" class="btn" data-commission-order="${esc(order.id)}">文案</button>
       </div>
     </article>`).join('');
   $('#commissionCards').innerHTML=cards||'<div class="panel commission-empty">暂无已回款订单</div>';
   updateCommissionSelection(visibleOrders);
+  $('#commissionPagination').classList.toggle('hidden',pageCount<=1);
+  $('#commissionPageInfo').textContent=pageCount?`第 ${commissionPage} / ${pageCount} 页`:'';
+  $('#commissionPrevPage').disabled=commissionPage<=1;
+  $('#commissionNextPage').disabled=commissionPage>=pageCount;
 }
 
 async function setCommissionSettlement(ids,state){
@@ -695,45 +750,100 @@ function buildCommissionText(order,name){
 }
 
 const commissionEditor=$('#commissionEditor');
-const commissionForm=$('#commissionForm');
-const commissionName=$('#commissionName');
 const commissionText=$('#commissionText');
 const commissionFeedback=$('#commissionFeedback');
-const commissionSave=$('#saveCommission');
 const commissionCopy=$('#copyCommission');
-const commissionCancel=$('#cancelCommission');
+const sharedCommissionName=$('#commissionSharedName');
+const sharedCommissionApply=$('#applyCommissionSharedName');
+const sharedCommissionStatus=$('#commissionSharedNameStatus');
+let savedCommissionName='';
 
-function updateCommissionPreview(){
-  const order=mine().find(item=>item.id===commissionEditor.dataset.orderId);
-  if(!order)return;
-  const name=commissionNameText(commissionName.value);
-  commissionText.value=buildCommissionText(order,name);
-  commissionFeedback.textContent='';
-  commissionCopy.disabled=!name||commissionSave.disabled;
+function setCommissionNameControls(disabled){
+  sharedCommissionName.disabled=disabled;
+  sharedCommissionApply.disabled=disabled;
 }
 
+function resetCommissionPreference(){
+  savedCommissionName='';
+  sharedCommissionName.value='';
+  sharedCommissionStatus.textContent='';
+  setCommissionNameControls(true);
+}
+
+async function loadCommissionPreference(){
+  const ownerId=current?.id;
+  if(!ownerId)return;
+  resetCommissionPreference();
+  try{
+    const {data,error}=await sb.from('commission_preferences')
+      .select('customer_name')
+      .eq('owner_id',ownerId)
+      .maybeSingle();
+    if(current?.id!==ownerId)return;
+    if(error)throw error;
+    savedCommissionName=data?.customer_name||'';
+    sharedCommissionName.value=savedCommissionName;
+  }catch(err){
+    if(current?.id===ownerId)sharedCommissionStatus.textContent='读取客户归属失败：'+errText(err);
+  }finally{
+    if(current?.id===ownerId)setCommissionNameControls(false);
+  }
+}
+
+async function saveCommissionPreference(){
+  const ownerId=current?.id;
+  if(!ownerId||sharedCommissionName.disabled)return;
+  const name=commissionNameText(sharedCommissionName.value);
+  sharedCommissionName.value=name;
+  if(name===savedCommissionName)return;
+  setCommissionNameControls(true);
+  sharedCommissionStatus.textContent='正在保存…';
+  try{
+    const {data,error}=await sb.from('commission_preferences')
+      .upsert({owner_id:ownerId,customer_name:name},{onConflict:'owner_id'})
+      .select('customer_name')
+      .single();
+    if(current?.id!==ownerId)return;
+    if(error)throw error;
+    savedCommissionName=data.customer_name;
+    sharedCommissionName.value=savedCommissionName;
+    sharedCommissionStatus.textContent=name?'已应用到所有订单':'已清除统一归属';
+  }catch(err){
+    if(current?.id!==ownerId)return;
+    sharedCommissionName.value=savedCommissionName;
+    sharedCommissionStatus.textContent='保存失败：'+errText(err);
+  }finally{
+    if(current?.id===ownerId)setCommissionNameControls(false);
+  }
+}
+
+sharedCommissionName.addEventListener('change',saveCommissionPreference);
+$('#commissionSharedNameForm').addEventListener('submit',event=>{
+  event.preventDefault();
+  saveCommissionPreference();
+});
+
+function effectiveCommissionName(order){
+  return commissionNameText(sharedCommissionName.value)||commissionNameText(order.commissionName||'');
+}
 
 function openCommissionEditor(order){
-  commissionEditor.dataset.orderId=order.id;
-  commissionName.value=order.commissionName||'';
-  updateCommissionPreview();
+  const name=effectiveCommissionName(order);
+  commissionText.value=buildCommissionText(order,name);
+  commissionCopy.disabled=!name;
+  commissionFeedback.textContent=name?'':'请先在上方填写客户归属';
   commissionEditor.showModal();
 }
 
 async function copyCommissionOrders(orders){
   if(!orders.length)return;
-  const unnamed=orders.filter(order=>!commissionNameText(order.commissionName||''));
-  if(unnamed.length){
-    if(orders.length===1){
-      openCommissionEditor(orders[0]);
-      commissionFeedback.textContent='请先填写客户归属';
-    }else{
-      toast(`所选订单有 ${unnamed.length} 笔未填写客户归属，请先编辑名字`);
-    }
+  if(orders.some(order=>!effectiveCommissionName(order))){
+    toast('请先在上方填写客户归属');
+    if(!sharedCommissionName.disabled)sharedCommissionName.focus();
     return;
   }
 
-  const text=orders.map(order=>buildCommissionText(order,commissionNameText(order.commissionName)))
+  const text=orders.map(order=>buildCommissionText(order,effectiveCommissionName(order)))
     .join('\n\n');
   try{
     await navigator.clipboard.writeText(text);
@@ -771,13 +881,20 @@ $('#commissionCards').addEventListener('change',event=>{
 
 $('#commissionSelectAll').addEventListener('change',event=>{
   commissionSelectedIds.clear();
-  const checked=event.target.checked;
-  $$('#commissionCards [data-commission-select]').forEach(input=>{
-    input.checked=checked;
-    if(checked)commissionSelectedIds.add(input.dataset.commissionSelect);
-  });
-  updateCommissionSelection();
+  if(event.target.checked){
+    commissionOrders(mine()).forEach(order=>commissionSelectedIds.add(order.id));
+  }
+  renderCommission();
 });
+
+function turnCommissionPage(direction){
+  commissionPage+=direction;
+  renderCommission();
+  $('#commissionToolbar').scrollIntoView({block:'start'});
+}
+
+$('#commissionPrevPage').addEventListener('click',()=>turnCommissionPage(-1));
+$('#commissionNextPage').addEventListener('click',()=>turnCommissionPage(1));
 
 $('#commissionBulkCopy').addEventListener('click',()=>copyCommissionOrders(getSelectedCommissionOrders()));
 $('#commissionBulkSettlement').addEventListener('change',event=>{
@@ -787,14 +904,9 @@ $('#commissionBulkSettlement').addEventListener('change',event=>{
 });
 $('#closeCommissionCopyFallback').addEventListener('click',()=>$('#commissionCopyFallback').close());
 
-commissionName.addEventListener('input',updateCommissionPreview);
-commissionCancel.addEventListener('click',()=>commissionEditor.close());
-commissionEditor.addEventListener('cancel',event=>{
-  if(commissionSave.disabled)event.preventDefault();
-});
-
+$('#cancelCommission').addEventListener('click',()=>commissionEditor.close());
 commissionCopy.addEventListener('click',async()=>{
-  if(!commissionNameText(commissionName.value))return;
+  if(commissionCopy.disabled)return;
   try{
     await navigator.clipboard.writeText(commissionText.value);
     commissionFeedback.textContent='文案已复制';
@@ -802,40 +914,6 @@ commissionCopy.addEventListener('click',async()=>{
     commissionText.focus();
     commissionText.select();
     commissionFeedback.textContent='文案已选中，可手动复制';
-  }
-});
-
-commissionForm.addEventListener('submit',async event=>{
-  event.preventDefault();
-  const ownerId=current?.id;
-  const orderId=commissionEditor.dataset.orderId;
-  if(!ownerId||!orderId||commissionSave.disabled)return;
-  const name=commissionNameText(commissionName.value);
-  commissionSave.disabled=true;
-  commissionCancel.disabled=true;
-  commissionCopy.disabled=true;
-  commissionName.readOnly=true;
-  commissionFeedback.textContent='';
-  try{
-    const {data,error}=await sb.from('orders')
-      .update({commission_customer_name:name,updated_at:new Date().toISOString()})
-      .eq('id',orderId)
-      .eq('owner_id',ownerId)
-      .select('commission_customer_name')
-      .single();
-    if(current?.id!==ownerId)return;
-    if(error)throw error;
-    const order=mine().find(item=>item.id===orderId);
-    if(order)order.commissionName=data.commission_customer_name;
-    commissionEditor.close();
-    toast('名字已保存到云端');
-  }catch(err){
-    commissionFeedback.textContent='保存失败：'+errText(err);
-  }finally{
-    commissionSave.disabled=false;
-    commissionCancel.disabled=false;
-    commissionName.readOnly=false;
-    commissionCopy.disabled=!commissionNameText(commissionName.value);
   }
 });
 

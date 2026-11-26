@@ -252,6 +252,7 @@ main{min-width:0;max-width:100%;}
   grid-template-columns:repeat(auto-fill,minmax(min(100%,255px),1fr));
   gap:14px;
 }
+@media(min-width:1800px){.commission-grid{grid-template-columns:repeat(6,minmax(0,1fr))}}
 .commission-card{display:grid;gap:15px;padding:16px;min-width:0}
 .commission-card.is-settled{background:#edf9f0}
 .commission-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
@@ -551,14 +552,14 @@ function normalizePaymentMethod(payment){
   return value==='咸鱼'?'闲鱼':value;
 }
 
-function paymentProfitRate(payment){
-  return normalizePaymentMethod(payment)==='闲鱼'?24:30;
+function paymentProfitRate(payment,category=''){
+  return category==='协议价'||normalizePaymentMethod(payment)==='闲鱼'?24:30;
 }
 
-function calculateOrderProfit(deposit,payment){
+function calculateOrderProfit(deposit,payment,category=''){
   const amount=Number(deposit)||0;
   const depositInCents=Math.round(Math.abs(amount)*100);
-  const profitInCents=Math.round(depositInCents*paymentProfitRate(payment)/100);
+  const profitInCents=Math.round(depositInCents*paymentProfitRate(payment,category)/100);
   return Math.sign(amount)*profitInCents/100;
 }
 
@@ -645,7 +646,7 @@ function commissionOrders(orders){
 const COMMISSION_SETTLEMENT_STATES=['未结款','已结款'];
 const commissionSelectedIds=new Set();
 let commissionSettlementSaving=false;
-const COMMISSION_PAGE_SIZE=15;
+const COMMISSION_PAGE_SIZE=18;
 let commissionPage=1;
 
 function getSelectedCommissionOrders(){
@@ -988,7 +989,7 @@ document.addEventListener('keydown',event=>{
 window.addEventListener('resize',()=>{
   if(activeDatePicker)positionDatePicker(document.querySelector('.date-picker-popover'));
 });
-function showOrder(id){const old=id?mine().find(o=>o.id===id):null;const d=old||{no:'',company:'',hotel:'',name:'',placed:new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10),checkin:'',checkout:'',nights:'',cost:'',quote:'',profit:'',deposit:'',balance:'',paid:'待定',payment:'闲鱼',status:'待定',categoryGroup:'',category:'',note:''};$('#modalRoot').innerHTML=`<div class="modal-back" id="backdrop"><div class="modal"><div class="modal-head"><div class="modal-title"><h2>${old?'编辑订单':'新建订单'}</h2><select id="newCategorySelect" class="category-select"><option value="">全部订单</option><option value="FHR">FHR</option><option value="GDS">GDS</option><option value="积分房">积分房</option><option value="同住人">同住人</option><option value="房卡房">房卡房</option><option value="假单">假单</option></select></div><button class="close" type="button" id="closeModal">×</button></div><form id="orderForm"><input type="hidden" name="no" value="${esc(d.no)}"><input type="hidden" name="company" value="${esc(d.company)}"><div class="form-grid"><label class="field">酒店<input name="hotel" value="${esc(d.hotel)}" placeholder="酒店名称" required></label><label class="field">姓名<input name="name" value="${esc(d.name)}" placeholder="入住人姓名" required></label><label class="field">下单时间<input name="placed" type="date" value="${esc(d.placed)}" ${old?'':'readonly'}></label><label class="field">入住日期<input name="checkin" type="date" value="${esc(d.checkin)}" onclick="if(this.showPicker)this.showPicker()"></label><label class="field">离店日期<input name="checkout" type="date" value="${esc(d.checkout)}" onclick="if(this.showPicker)this.showPicker()"></label><label class="field">入住晚数<input name="nights" type="number" min="0" value="${esc(d.nights)}" placeholder="根据入住和离店日期自动计算" readonly></label><label class="field">入住天数<input name="days" type="number" min="0" value="${d.days|| (d.nights?+d.nights+1:'')}" placeholder="根据入住和离店日期自动计算" readonly></label><label class="field">成本（元）<input name="cost" type="number" min="0" step="0.01" value="${esc(d.cost)}" placeholder="可填写可不填写"></label><label class="field">报价（元）<input name="quote" type="number" min="0" step="0.01" value="${esc(d.quote)}" required></label><label class="field">定金（元）<input name="deposit" type="number" min="0" step="0.01" value="${esc(d.deposit)}"></label><label class="field">尾款（元）<input name="balance" type="number" min="0" step="0.01" value="${esc(d.balance)}" readonly placeholder="根据报价、晚数和定金自动计算"></label><label class="field">利润比例<input name="rate" readonly></label><label class="field">利润（元）<input name="profit" type="number" step="0.01" value="${esc(d.profit)}" placeholder="无需填写" readonly></label><label class="field">回款<select name="paid"><option ${d.paid==='是'?'selected':''}>是</option><option ${d.paid==='否'?'selected':''}>否</option><option ${d.paid==='待定'?'selected':''}>待定</option></select></label><label class="field">付款方式<select name="payment">${paymentMethodOptions(d.payment)}</select></label><label class="field">成功入住<select name="status"><option ${d.status==='是'?'selected':''}>是</option><option ${d.status==='否'?'selected':''}>否</option><option ${d.status==='待定'?'selected':''}>待定</option></select></label><label class="field wide2">备注<textarea name="note" placeholder="补充说明">${esc(d.note)}</textarea></label></div><div class="modal-actions"><button type="button" class="btn" id="cancelModal">取消</button><button class="btn primary">保存订单</button></div></form></div></div>`;const form=$('#orderForm'),f=form.elements;$('#newCategorySelect').value=old?.category||'';function calc(){f.rate.value=paymentProfitRate(f.payment.value)+'%';if(f.checkin.value&&f.checkout.value){const n=Math.max(0,Math.round((new Date(f.checkout.value+'T00:00:00')-new Date(f.checkin.value+'T00:00:00'))/86400000));f.nights.value=n;f.days.value=n+1}else{f.nights.value='';f.days.value=''}f.profit.value=f.deposit.value?calculateOrderProfit(f.deposit.value,f.payment.value).toFixed(2):'';f.balance.value=(f.quote.value&&f.nights.value)?Math.max(0,(+f.quote.value)*(+f.nights.value)-(+f.deposit.value||0)).toFixed(2):''}['checkin','checkout','deposit','quote'].forEach(k=>{f[k].addEventListener('input',calc);f[k].addEventListener('change',calc)});f.payment.addEventListener('change',calc);calc();['closeModal','cancelModal'].forEach(k=>$('#'+k).onclick=()=>$('#modalRoot').innerHTML='');$('#backdrop').onclick=e=>{if(e.target.id==='backdrop')$('#modalRoot').innerHTML=''};form.onsubmit=async e=>{e.preventDefault();const x=Object.fromEntries(new FormData(form));x.category=$('#newCategorySelect').value;const item={...x,id:old?old.id:crypto.randomUUID(),owner:current.username,created:old?old.created:new Date().toISOString()};try{await saveOrder(item);$('#modalRoot').innerHTML='';render();toast(old?'订单已更新并保存到云端':'订单已创建并保存到云端')}catch(err){toast('保存失败：'+errText(err))}}}
+function showOrder(id){const old=id?mine().find(o=>o.id===id):null;const d=old||{no:'',company:'',hotel:'',name:'',placed:new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10),checkin:'',checkout:'',nights:'',cost:'',quote:'',profit:'',deposit:'',balance:'',paid:'待定',payment:'闲鱼',status:'待定',categoryGroup:'',category:'',note:''};$('#modalRoot').innerHTML=`<div class="modal-back" id="backdrop"><div class="modal"><div class="modal-head"><div class="modal-title"><h2>${old?'编辑订单':'新建订单'}</h2><select id="newCategorySelect" class="category-select"><option value="">全部订单</option><option value="协议价">协议价</option><option value="FHR">FHR</option><option value="GDS">GDS</option><option value="积分房">积分房</option><option value="同住人">同住人</option><option value="房卡房">房卡房</option><option value="假单">假单</option></select></div><button class="close" type="button" id="closeModal">×</button></div><form id="orderForm"><input type="hidden" name="no" value="${esc(d.no)}"><input type="hidden" name="company" value="${esc(d.company)}"><div class="form-grid"><label class="field">酒店<input name="hotel" value="${esc(d.hotel)}" placeholder="酒店名称" required></label><label class="field">姓名<input name="name" value="${esc(d.name)}" placeholder="入住人姓名" required></label><label class="field">下单时间<input name="placed" type="date" value="${esc(d.placed)}" ${old?'':'readonly'}></label><label class="field">入住日期<input name="checkin" type="date" value="${esc(d.checkin)}" onclick="if(this.showPicker)this.showPicker()"></label><label class="field">离店日期<input name="checkout" type="date" value="${esc(d.checkout)}" onclick="if(this.showPicker)this.showPicker()"></label><label class="field">入住晚数<input name="nights" type="number" min="0" value="${esc(d.nights)}" placeholder="根据入住和离店日期自动计算" readonly></label><label class="field">入住天数<input name="days" type="number" min="0" value="${d.days|| (d.nights?+d.nights+1:'')}" placeholder="根据入住和离店日期自动计算" readonly></label><label class="field">成本（元）<input name="cost" type="number" min="0" step="0.01" value="${esc(d.cost)}" placeholder="可填写可不填写"></label><label class="field">报价（元）<input name="quote" type="number" min="0" step="0.01" value="${esc(d.quote)}" required></label><label class="field">定金（元）<input name="deposit" type="number" min="0" step="0.01" value="${esc(d.deposit)}"></label><label class="field">尾款（元）<input name="balance" type="number" min="0" step="0.01" value="${esc(d.balance)}" readonly placeholder="根据报价、晚数和定金自动计算"></label><label class="field">利润比例<input name="rate" readonly></label><label class="field">利润（元）<input name="profit" type="number" step="0.01" value="${esc(d.profit)}" placeholder="无需填写" readonly></label><label class="field">回款<select name="paid"><option ${d.paid==='是'?'selected':''}>是</option><option ${d.paid==='否'?'selected':''}>否</option><option ${d.paid==='待定'?'selected':''}>待定</option></select></label><label class="field">付款方式<select name="payment">${paymentMethodOptions(d.payment)}</select></label><label class="field">成功入住<select name="status"><option ${d.status==='是'?'selected':''}>是</option><option ${d.status==='否'?'selected':''}>否</option><option ${d.status==='待定'?'selected':''}>待定</option></select></label><label class="field wide2">备注<textarea name="note" placeholder="补充说明">${esc(d.note)}</textarea></label></div><div class="modal-actions"><button type="button" class="btn" id="cancelModal">取消</button><button class="btn primary">保存订单</button></div></form></div></div>`;const form=$('#orderForm'),f=form.elements;$('#newCategorySelect').value=old?.category||'';function calc(){const category=$('#newCategorySelect').value;f.rate.value=paymentProfitRate(f.payment.value,category)+'%';if(f.checkin.value&&f.checkout.value){const n=Math.max(0,Math.round((new Date(f.checkout.value+'T00:00:00')-new Date(f.checkin.value+'T00:00:00'))/86400000));f.nights.value=n;f.days.value=n+1}else{f.nights.value='';f.days.value=''}f.profit.value=f.deposit.value?calculateOrderProfit(f.deposit.value,f.payment.value,category).toFixed(2):(old&&Number(old.deposit)===0?old.profit:'');f.balance.value=(f.quote.value&&f.nights.value)?Math.max(0,(+f.quote.value)*(+f.nights.value)-(+f.deposit.value||0)).toFixed(2):''}['checkin','checkout','deposit','quote'].forEach(k=>{f[k].addEventListener('input',calc);f[k].addEventListener('change',calc)});f.payment.addEventListener('change',calc);$('#newCategorySelect').addEventListener('change',calc);calc();['closeModal','cancelModal'].forEach(k=>$('#'+k).onclick=()=>$('#modalRoot').innerHTML='');$('#backdrop').onclick=e=>{if(e.target.id==='backdrop')$('#modalRoot').innerHTML=''};form.onsubmit=async e=>{e.preventDefault();const x=Object.fromEntries(new FormData(form));x.category=$('#newCategorySelect').value;const item={...x,id:old?old.id:crypto.randomUUID(),owner:current.username,created:old?old.created:new Date().toISOString()};try{await saveOrder(item);$('#modalRoot').innerHTML='';render();toast(old?'订单已更新并保存到云端':'订单已创建并保存到云端')}catch(err){toast('保存失败：'+errText(err))}}}
 const INLINE_ORDER_COLUMNS = {
   no:'confirmation_no',
   company:'company',
@@ -1008,12 +1009,15 @@ window.updateOrderField=async(id,field,value)=>{
     [column]:field==='category'?(cleaned||'全部订单'):cleaned,
     updated_at:new Date().toISOString(),
   };
+  if(field==='category'&&Number(order.deposit)>0){
+    changes.profit=calculateOrderProfit(order.deposit,order.payment,cleaned);
+  }
   try{
     const {data,error}=await sb.from('orders')
       .update(changes)
       .eq('id',id)
       .eq('owner_id',ownerId)
-      .select('confirmation_no,company,paid_status,stay_status,order_type')
+      .select('confirmation_no,company,paid_status,stay_status,order_type,profit')
       .single();
     if(current?.id!==ownerId)return;
     if(error)throw error;
@@ -1021,13 +1025,14 @@ window.updateOrderField=async(id,field,value)=>{
     const saved=mine().find(item=>item.id===id);
     if(saved){
       saved[field]=field==='category'&&data[column]==='全部订单'?'':data[column];
+      if(field==='category')saved.profit=data.profit;
       if(field==='no'||field==='company'){
         saved.paid=data.paid_status;
         saved.status=data.stay_status;
       }
     }
-    renderOrders();
-    toast('已保存到云端');
+    render();
+    toast(field==='category'&&changes.profit!==undefined?'订单类型已保存，利润已按 '+paymentProfitRate(order.payment,cleaned)+'% 重算':'已保存到云端');
   }catch(err){
     if(current?.id!==ownerId)return;
     renderOrders();
@@ -1062,14 +1067,14 @@ window.updateOrderPayment=async(id,select)=>{
   if(!PAYMENT_METHODS.includes(payment)){select.value=previous;return;}
   if(payment===previous)return;
 
-  const profit=calculateOrderProfit(order.deposit,payment);
+  const profit=Number(order.deposit)>0?calculateOrderProfit(order.deposit,payment,order.category):Number(order.profit)||0;
   select.disabled=true;
   try{
     if(!await saveOrderCalculation(order,{payment_method:payment,profit}))return;
     const saved=mine().find(item=>item.id===id);
     if(saved)Object.assign(saved,{payment,profit});
     render();
-    toast('付款方式已保存，利润已按 '+paymentProfitRate(payment)+'% 重算');
+    toast('付款方式已保存，利润已按 '+paymentProfitRate(payment,order.category)+'% 重算');
   }catch(err){
     select.value=previous;
     toast('付款方式保存失败：'+errText(err));
@@ -1078,7 +1083,7 @@ window.updateOrderPayment=async(id,select)=>{
   }
 };
 
-window.confirmDepositChange=async(id,input)=>{const o=orders.find(x=>x.id===id);if(!o||!current)return;const previous=Number(o.deposit)||0,raw=String(input.value).trim(),next=Number(raw);if(raw===''||!Number.isFinite(next)||next<0){input.value=previous;toast('请输入不小于 0 的有效定金金额');return}if(next===previous){input.value=previous;return}const nextProfit=calculateOrderProfit(next,o.payment),nextBalance=Number(o.quote)&&Number(o.nights)?Number(Math.max(0,Number(o.quote)*Number(o.nights)-next).toFixed(2)):(Number(o.balance)||0);if(!confirm('确认修改定金吗？\n定金：'+money(previous)+' → '+money(next)+'\n利润：'+money(o.profit)+' → '+money(nextProfit)+'\n尾款：'+money(o.balance)+' → '+money(nextBalance))){input.value=previous;return}input.disabled=true;try{if(!await saveOrderCalculation(o,{deposit:next,profit:nextProfit,balance:nextBalance}))return;const saved=mine().find(order=>order.id===id);if(saved)Object.assign(saved,{deposit:next,profit:nextProfit,balance:nextBalance});render();toast('定金已确认，利润和尾款已重算并保存到云端')}catch(err){input.value=previous;toast('定金保存失败：'+errText(err))}finally{input.disabled=false}};
+window.confirmDepositChange=async(id,input)=>{const o=orders.find(x=>x.id===id);if(!o||!current)return;const previous=Number(o.deposit)||0,raw=String(input.value).trim(),next=Number(raw);if(raw===''||!Number.isFinite(next)||next<0){input.value=previous;toast('请输入不小于 0 的有效定金金额');return}if(next===previous){input.value=previous;return}const nextProfit=calculateOrderProfit(next,o.payment,o.category),nextBalance=Number(o.quote)&&Number(o.nights)?Number(Math.max(0,Number(o.quote)*Number(o.nights)-next).toFixed(2)):(Number(o.balance)||0);if(!confirm('确认修改定金吗？\n定金：'+money(previous)+' → '+money(next)+'\n利润：'+money(o.profit)+' → '+money(nextProfit)+'\n尾款：'+money(o.balance)+' → '+money(nextBalance))){input.value=previous;return}input.disabled=true;try{if(!await saveOrderCalculation(o,{deposit:next,profit:nextProfit,balance:nextBalance}))return;const saved=mine().find(order=>order.id===id);if(saved)Object.assign(saved,{deposit:next,profit:nextProfit,balance:nextBalance});render();toast('定金已确认，利润和尾款已重算并保存到云端')}catch(err){input.value=previous;toast('定金保存失败：'+errText(err))}finally{input.disabled=false}};
 window.editOrder=id=>{const x=orders.find(o=>o.id===id);if(x)showOrder(id)};
 window.deleteOrder=async id=>{const x=orders.find(o=>o.id===id);if(!x)return;if(confirm('确定删除订单「'+(x.no||x.hotel)+'」吗？')){const {error}=await sb.from('orders').delete().eq('id',id);if(error){toast('删除失败：'+errText(error));return}await loadOrders();render();toast('订单已从云端删除')}};
 async function renderStaff(){if(!current||current.role!=='admin')return;const {data,error}=await sb.from('profiles').select('id,username,role,created_at').order('created_at');if(error){toast('员工列表读取失败：'+errText(error));return}users=data||[];$('#staffList').innerHTML=users.map(u=>'<div class="admin-row"><span><b>'+esc(u.username)+'</b> <span class="pill '+(u.role==='admin'?'ok':'wait')+'">'+(u.role==='admin'?'管理员':'员工')+'</span><div class="small-note">'+(u.role==='admin'?'管理员账号':'仅可查看和管理本人录入的订单')+'</div></span>'+(u.role==='admin'?'<span class="small-note">管理员</span>':'<button class="linkbtn del" onclick="removeStaff(\''+u.id+'\')">删除账号</button>')+'</div>').join('')||'<div class="small-note">暂无员工</div>'}
@@ -1093,6 +1098,7 @@ $('#importFile').onchange=async e=>{const file=e.target.files[0];if(!file)return
 function parseCSV(raw){const text=raw.replace(/^\ufeff/,'');const out=[];let row=[],cell='',quoted=false;for(let i=0;i<text.length;i++){const c=text[i];if(quoted){if(c==='"'&&text[i+1]==='"'){cell+='"';i++}else if(c==='"')quoted=false;else cell+=c}else if(c==='"')quoted=true;else if(c===','){row.push(cell);cell=''}else if(c==='\n'){row.push(cell.replace(/\r$/,''));out.push(row);row=[];cell=''}else cell+=c}if(cell.length||row.length){row.push(cell.replace(/\r$/,''));out.push(row)}return out}
 $('#exportBtn').onclick=()=>{const rows=mine().map(o=>[o.no,o.company,o.hotel,o.name,o.placed,o.checkin,o.checkout,o.nights,o.cost,o.quote,o.deposit,o.balance,o.profit,o.paid,o.status,o.category||'全部订单',o.payment,o.note]);const head=['订单号','协议公司','酒店','姓名','下单时间','入住日期','离店日期','入住晚数','成本','报价','定金','尾款','利润','回款状态','入住状态','订单类型','付款方式','备注'];const csv='\ufeff'+[head,...rows].map(r=>r.map(x=>'"'+String(x??'').replaceAll('"','""')+'"').join(',')).join('\r\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.download='我的酒店订单.csv';a.click();URL.revokeObjectURL(a.href)};var toastTimer;function toast(msg){const el=$('#toast');el.textContent=msg;el.classList.remove('hidden');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.add('hidden'),2200)}init();
 </script></body></html>
+
 
 
 

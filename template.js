@@ -85,6 +85,37 @@ function openTemplate(template) {
   const fields = document.getElementById('templateFields');
   fields.replaceChildren();
   template.fields.forEach((field, index) => {
+    if (field.label === '邮箱' && field.example.includes('@')) {
+      const group = document.createElement('div');
+      group.className = 'field';
+      group.textContent = '邮箱';
+      const parts = document.createElement('div');
+      parts.className = 'template-email-parts';
+      const localLabel = document.createElement('label');
+      localLabel.textContent = '@ 前内容';
+      const local = document.createElement('input');
+      local.name = String(index);
+      local.placeholder = field.example.split('@')[0];
+      local.required = true;
+      local.maxLength = 100;
+      local.pattern = '[^@\\s]+';
+      local.title = '只填写 @ 前的内容';
+      localLabel.append(local);
+      const suffixLabel = document.createElement('label');
+      suffixLabel.textContent = '邮箱后缀（可修改）';
+      const suffix = document.createElement('input');
+      suffix.name = index + '-suffix';
+      suffix.value = field.example.slice(field.example.indexOf('@'));
+      suffix.required = true;
+      suffix.maxLength = 100;
+      suffix.pattern = '@[^@\\s]+\\.[^@\\s]+';
+      suffix.title = '填写以 @ 开头的邮箱后缀，例如 @bytedances.com.cn';
+      suffixLabel.append(suffix);
+      parts.append(localLabel, suffixLabel);
+      group.append(parts);
+      fields.append(group);
+      return;
+    }
     const label = document.createElement('label');
     label.className = 'field';
     label.textContent = field.label;
@@ -165,7 +196,11 @@ document.getElementById('templateForm').onsubmit = async event => {
   event.preventDefault();
   if (!activeTemplate) return;
   const button = document.getElementById('generateTemplate');
-  const values = activeTemplate.fields.map((_, i) => document.querySelector(`#templateFields input[name="${i}"]`).value.trim());
+  const values = activeTemplate.fields.map((field, i) => {
+    const value = document.querySelector(`#templateFields input[name="${i}"]`).value.trim();
+    const suffix = document.querySelector(`#templateFields input[name="${i}-suffix"]`);
+    return field.label === '邮箱' && suffix ? value + suffix.value.trim() : value;
+  });
   if (values.some(v => !v)) return;
   button.disabled = true;
   clearTemplateResult();

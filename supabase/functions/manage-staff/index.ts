@@ -25,7 +25,8 @@ Deno.serve(async (req: Request) => {
     ?? Deno.env.get("SUPABASE_SECRET_KEY")
     ?? JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS") ?? "{}")?.default;
   const authHeader = req.headers.get("Authorization");
-  if (!url || !publicKey || !adminKey || !authHeader) return reply(500, { error: "Server configuration is incomplete" });
+  if (!url || !publicKey || !adminKey) return reply(500, { error: "Server configuration is incomplete" });
+  if (!authHeader) return reply(401, { error: "Sign in is required" });
 
   const caller = createClient(url, publicKey, { global: { headers: { Authorization: authHeader } }, auth: { persistSession: false } });
   const token = authHeader.replace(/^Bearer\s+/i, "");

@@ -541,11 +541,8 @@ function clearOrderFilters(){
 
 
 function commissionOrders(orders){
-  const today=checkinWindow().firstDay;
-  return orders.filter(order=>
-    order.status==='是' && order.checkout && order.checkout<=today
-    && order.category!=='取消单' && order.category!=='已取消'
-  ).sort((a,b)=>b.checkout.localeCompare(a.checkout));
+  return orders.filter(order=>order.paid==='是')
+    .sort((a,b)=>(b.checkout||'').localeCompare(a.checkout||''));
 }
 
 function renderCommission(){
@@ -561,7 +558,7 @@ function renderCommission(){
         <div><dt>利润</dt><dd class="profit">${money(order.profit)}</dd></div>
       </dl>
     </article>`).join('');
-  $('#commissionCards').innerHTML=cards||'<div class="panel commission-empty">暂无已完成入住的订单</div>';
+  $('#commissionCards').innerHTML=cards||'<div class="panel commission-empty">暂无已回款订单</div>';
 }
 
 function commissionNameText(value){

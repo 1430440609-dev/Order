@@ -185,8 +185,16 @@ async function renderTemplatePSD(template, values) {
     templateProgress(35, '正在打开 PSD 图层…');
     await photopeaMessage(frame, psd, 90000);
     templateProgress(60, '正在替换文字图层…');
-    const replacements = template.fields.map((field, i) => ({layer:field.layer,value:values[i]}));
-    const script = `(function(){try{var items=${JSON.stringify(replacements)};var doc=app.activeDocument;if(!doc)throw Error('PSD 没有打开');function find(group,name){for(var i=0;i<group.length;i++){var layer=group[i];if(layer.name===name)return layer;if(layer.layers){var nested=find(layer.layers,name);if(nested)return nested}}return null}for(var j=0;j<items.length;j++){var layer=find(doc.layers,items[j].layer);if(!layer||!layer.textItem)throw Error('找不到文字图层：'+items[j].layer);layer.textItem.contents=items[j].value}doc.saveToOE('png')}catch(error){app.echoToOE('TEMPLATE_ERROR:'+error.message)}})();`;
+    const replacements = template.fields.map((field, i) => ({
+      layer: field.layer,
+      value: values[i],
+      style: template.id === '名片/LV（名字+邮箱+电话）' && field.layer === '名字'
+        ? 'lv-name'
+        : template.id === '名片/LV（名字+邮箱+电话）' && field.layer === '电话'
+          ? 'lv-phone'
+          : ''
+    }));
+    const script = `(function(){try{var items=${JSON.stringify(replacements)};var doc=app.activeDocument;if(!doc)throw Error('PSD 没有打开');function find(group,name){for(var i=0;i<group.length;i++){var layer=group[i];if(layer.name===name)return layer;if(layer.layers){var nested=find(layer.layers,name);if(nested)return nested}}return null}for(var j=0;j<items.length;j++){var layer=find(doc.layers,items[j].layer);if(!layer||!layer.textItem)throw Error('找不到文字图层：'+items[j].layer);layer.textItem.contents=items[j].value;if(items[j].style==='lv-name'){layer.textItem.verticalScale=115;layer.textItem.horizontalScale=95}else if(items[j].style==='lv-phone'){layer.textItem.fauxBold=false}}doc.saveToOE('png')}catch(error){app.echoToOE('TEMPLATE_ERROR:'+error.message)}})();`;
     templateProgress(75, '正在导出 PNG 图片…');
     const png = await photopeaMessage(frame, script, 90000);
     if (!png) throw new Error('PSD 编辑器没有返回图片');

@@ -1158,6 +1158,9 @@ $('#recognizePasteOrder').onclick=async()=>{
     calc();
     if(result.balance!==null&&result.quote===null)f.balance.value=result.balance.toFixed(2);
     const messages=['已识别并填入表单'];
+    if(result.nights>1&&result.deposit!==null&&result.balance!==null&&result.quote!==null){
+      messages.push(`按 ${result.nights} 晚分摊：定金每晚 ¥${(result.deposit/result.nights).toFixed(2)}＋尾款每晚 ¥${(result.balance/result.nights).toFixed(2)}＝每晚报价 ¥${result.quote.toFixed(2)}`);
+    }
     if(result.missing.length)messages.push('请手动填写：'+result.missing.join('、'));
     if(pinyinWarning)messages.push(pinyinWarning);
     if(result.warnings.length)messages.push(result.warnings.join('、'));
@@ -1243,7 +1246,8 @@ function parseBookingPaste(raw,romanize=bookingNameToPinyin){
   const deposit=bookingPasteAmount(get('代订费','定金'));
   const balance=bookingPasteAmount(get('尾款'));
   const explicitQuote=bookingPasteAmount(get('报价','每晚报价'));
-  const quote=explicitQuote??(balance!==null&&deposit!==null&&nights>0?Number(((balance+deposit)/nights).toFixed(2)):null);
+  const sharedQuote=balance!==null&&deposit!==null&&nights>0?Number((deposit/nights+balance/nights).toFixed(2)):null;
+  const quote=sharedQuote??explicitQuote;
   const paymentRaw=get('付款信息','付款方式','支付方式');
   const payment=normalizePaymentMethod(paymentRaw);
   const notes=[];
@@ -1253,6 +1257,8 @@ function parseBookingPaste(raw,romanize=bookingNameToPinyin){
   for(const [label,value,date] of [['下单日期',placedRaw,placed],['入住日期',checkinRaw,checkin],['离店日期',checkoutRaw,checkout]])
     if(value&&!date)warnings.push(label+'格式无法识别');
   if(paymentRaw&&!PAYMENT_METHODS.includes(payment))warnings.push('付款方式需手动选择');
+  if(sharedQuote!==null&&explicitQuote!==null&&Math.abs(sharedQuote-explicitQuote)>0.01)
+    warnings.push('粘贴报价与金额分摊结果不同，已按定金和尾款计算');
   if(balance!==null&&quote!==null&&nights>0&&deposit!==null&&Math.abs(quote*nights-deposit-balance)>0.01)
     warnings.push('每晚报价已四舍五入，请核对尾款');
   const missing=[];

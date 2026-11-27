@@ -1,5 +1,24 @@
 [
   {
+    "id": "名片/LV（名字+邮箱）",
+    "kind": "名片",
+    "name": "LV（名字+邮箱）",
+    "psd": "template-assets/名片/LV（名字+邮箱）.psd",
+    "preview": "template-assets/名片/LV（名字+邮箱）.png",
+    "fields": [
+      {
+        "label": "名字",
+        "layer": "Xiaohui Zhang",
+        "example": "Xiaohui Zhang"
+      },
+      {
+        "label": "邮箱",
+        "layer": "xiaohui.zhang@louisvuitton.com",
+        "example": "xiaohui.zhang@louisvuitton.com"
+      }
+    ]
+  },
+  {
     "id": "名片/抖音（名字+邮箱）",
     "kind": "名片",
     "name": "抖音（名字+邮箱）",

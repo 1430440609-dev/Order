@@ -244,6 +244,10 @@ main{min-width:0;max-width:100%;}
 }
 @media(max-width:760px){.order-toolbar{padding:10px 12px}}
 .checkin-due{color:#ba2525;font-weight:700}
+#dashboardView #recentBody tr.checkin-today,
+#dashboardView #recentBody tr.checkin-today > td{background:#fff8ec}
+#dashboardView #recentBody tr.checkin-today:hover,
+#dashboardView #recentBody tr.checkin-today:hover > td{background:#fff3df}
 #ordersView .table-wrap tr.order-located > td{background:#eaf2ff;border-bottom:1px solid #8db3ff;border-top:1px solid #8db3ff}
 #ordersView .table-wrap tr.order-located > td:first-child{box-shadow:inset 3px 0 var(--blue)}
 
@@ -519,7 +523,7 @@ function upcomingCheckins(orders,window){
 function renderDashboard(list=mine()){
   $('#statTotal').textContent=list.length;$('#statOk').textContent=list.filter(o=>o.status==='是').length;$('#statWait').textContent=list.filter(o=>o.status==='待定').length;$('#statProfit').textContent=money(list.reduce((a,o)=>a+(+o.profit||0),0));renderChart(list);
   const dueWindow=checkinWindow();
-  $('#recentBody').innerHTML=upcomingCheckins(list,dueWindow).map(o=>'<tr><td class="order-no">'+esc(o.no)+'</td><td>'+esc(o.name)+'</td><td>'+esc(o.hotel)+'</td><td>'+checkinDateText(o,dueWindow)+'</td><td>'+(o.nights||0)+' 晚</td><td>'+money(o.quote)+'</td><td class="profit">'+money(o.profit)+'</td><td>'+statusPill(o.status)+'</td><td><button type="button" class="linkbtn" data-locate-order="'+esc(o.id)+'" aria-label="跳转到订单管理并定位">跳转</button></td></tr>').join('')
+  $('#recentBody').innerHTML=upcomingCheckins(list,dueWindow).map(o=>'<tr'+(o.checkin===dueWindow.firstDay?' class="checkin-today"':'')+'><td class="order-no">'+esc(o.no)+'</td><td>'+esc(o.name)+'</td><td>'+esc(o.hotel)+'</td><td>'+checkinDateText(o,dueWindow)+'</td><td>'+(o.nights||0)+' 晚</td><td>'+money(o.quote)+'</td><td class="profit">'+money(o.profit)+'</td><td>'+statusPill(o.status)+'</td><td><button type="button" class="linkbtn" data-locate-order="'+esc(o.id)+'" aria-label="跳转到订单管理并定位">跳转</button></td></tr>').join('')
     ||emptyRow(9,'未来 7 天没有待入住订单');
   labelCells($('#recentBody'),['确认号','姓名','酒店','入住日期','入住晚数','报价','利润','入住状态','操作']);
 }

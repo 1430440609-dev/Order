@@ -463,9 +463,19 @@ let current=null, orders=[], users=[], activeCategory='全部', sharedSettings={
 function errText(e){return e?.message||'云端请求失败，请稍后重试'}
 function withTimeout(promise,ms,label){return Promise.race([promise,new Promise((_,reject)=>setTimeout(()=>reject(new Error(label)),ms))])}
 let xlsxLoader;function loadXlsx(){if(window.XLSX)return Promise.resolve();if(!xlsxLoader)xlsxLoader=new Promise((resolve,reject)=>{const script=document.createElement('script');script.async=true;script.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';const timer=setTimeout(()=>{xlsxLoader=null;reject(new Error('Excel解析组件加载超时，请检查网络后重试'))},20000);script.onload=()=>{clearTimeout(timer);resolve()};script.onerror=()=>{clearTimeout(timer);xlsxLoader=null;reject(new Error('Excel解析组件连接失败，请检查网络后重试'))};document.head.appendChild(script)});return xlsxLoader}
-async function loadOrders(){const {data,error}=await sb.from('orders').select('*').order('created_at',{ascending:false});if(error)throw error;orders=(data||[]).map(r=>({id:r.id,ownerId:r.owner_id,owner:current.username,commissionName:r.commission_customer_name||'',commissionSettlement:r.commission_settlement_status||'未结款',no:r.confirmation_no,company:r.company,hotel:r.hotel,name:r.guest_name,placed:r.placed_date,checkin:r.checkin_date||'',checkout:r.checkout_date||'',nights:r.nights,days:r.days,cost:r.cost,quote:r.quote,deposit:r.deposit,balance:r.balance,profit:r.profit,paid:r.paid_status,payment:r.payment_method,status:r.stay_status,category:r.order_type==='全部订单'?'':r.order_type,note:r.note,created:r.created_at}));
+async function loadOrders(){const {data,error}=await sb.from('orders').select('*').order('created_at',{ascending:false});if(error)throw error;orders=(data||[]).map(r=>({id:r.id,ownerId:r.owner_id,owner:current.username,commissionName:r.commission_customer_name||'',commissionSettlement:r.commission_settlement_status||'未结款',no:r.confirmation_no,company:r.company,hotel:r.hotel,name:r.guest_name,placed:r.placed_date,checkin:r.checkin_date||'',checkout:r.checkout_date||'',nights:r.nights,days:r.days,cost:r.cost,quote:r.quote,deposit:r.deposit,balance:r.balance,profit:Number(r.deposit)>0?calculateOrderProfit(r.deposit,r.payment_method,r.order_type):r.profit,paid:r.paid_status,payment:r.payment_method,status:r.stay_status,category:r.order_type==='全部订单'?'':r.order_type,note:r.note,created:r.created_at}));
+  void syncOrderProfitRates(data||[]);
 }
-function toDbOrder(o){return {id:o.id,owner_id:current.id,confirmation_no:o.no||'',company:o.company||'',hotel:o.hotel||'',guest_name:o.name||'',placed_date:o.placed||new Date().toISOString().slice(0,10),checkin_date:o.checkin||null,checkout_date:o.checkout||null,nights:Number(o.nights)||0,days:Number(o.days)||0,cost:Number(o.cost)||0,quote:Number(o.quote)||0,deposit:Number(o.deposit)||0,balance:Number(o.balance)||0,profit:Number(o.profit)||0,paid_status:o.paid||'待定',payment_method:o.payment||'闲鱼',stay_status:o.status||'待定',order_type:o.category||'全部订单',note:o.note||'',created_at:o.created||new Date().toISOString(),updated_at:new Date().toISOString()}}
+async function syncOrderProfitRates(rows){
+  for(const row of rows){
+    if(Number(row.deposit)<=0)continue;
+    const profit=calculateOrderProfit(row.deposit,row.payment_method,row.order_type);
+    if(Math.abs((Number(row.profit)||0)-profit)<0.005)continue;
+    const {error}=await sb.from('orders').update({profit,updated_at:new Date().toISOString()}).eq('id',row.id).eq('owner_id',current.id);
+    if(error){console.error('利润比例同步失败',error);toast('部分订单利润同步失败，请刷新重试');break}
+  }
+}
+function toDbOrder(o){return {id:o.id,owner_id:current.id,confirmation_no:o.no||'',company:o.company||'',hotel:o.hotel||'',guest_name:o.name||'',placed_date:o.placed||new Date().toISOString().slice(0,10),checkin_date:o.checkin||null,checkout_date:o.checkout||null,nights:Number(o.nights)||0,days:Number(o.days)||0,cost:Number(o.cost)||0,quote:Number(o.quote)||0,deposit:Number(o.deposit)||0,balance:Number(o.balance)||0,profit:Number(o.deposit)>0?calculateOrderProfit(o.deposit,o.payment,o.category):Number(o.profit)||0,paid_status:o.paid||'待定',payment_method:o.payment||'闲鱼',stay_status:o.status||'待定',order_type:o.category||'全部订单',note:o.note||'',created_at:o.created||new Date().toISOString(),updated_at:new Date().toISOString()}}
 async function saveOrder(o){const {error}=await sb.from('orders').upsert(toDbOrder(o));if(error)throw error;await loadOrders()}
 async function loadSettings(){const {data,error}=await sb.from('app_settings').select('value').eq('key','site').maybeSingle();if(error)throw error;if(data?.value)sharedSettings={...sharedSettings,...data.value};document.title=sharedSettings.title||'住单 · 酒店订单管理';if($('#settingsTitle'))$('#settingsTitle').value=sharedSettings.title||'住单 · 酒店订单管理'}
 async function init(){const {data,error}=await sb.auth.getSession();if(error)console.error(error);if(data.session)await openApp(data.session.user)}
@@ -582,7 +592,7 @@ function normalizePaymentMethod(payment){
 }
 
 function paymentProfitRate(payment,category=''){
-  return category==='协议价'||normalizePaymentMethod(payment)==='闲鱼'?24:30;
+  return category==='协议价'?24:30;
 }
 
 function calculateOrderProfit(deposit,payment,category=''){

@@ -123,8 +123,13 @@ function openTemplate(template) {
     input.name = String(index);
     input.placeholder = field.example;
     input.required = true;
-    input.maxLength = 160;
+    input.maxLength = field.label === '电话' ? 32 : 160;
     if (field.label === '邮箱') input.type = 'email';
+    if (field.label === '电话') {
+      input.type = 'tel';
+      input.inputMode = 'tel';
+      input.value = field.default || field.example || '';
+    }
     label.append(input);
     fields.append(label);
   });

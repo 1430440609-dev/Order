@@ -597,8 +597,9 @@ function normalizePaymentMethod(payment){
   return value==='咸鱼'?'闲鱼':value;
 }
 
+const ORDER_TYPES_AT_24 = new Set(['','全部订单','协议价','假单','转推单','取消单','已取消']);
 function paymentProfitRate(payment,category=''){
-  return category==='协议价'?24:30;
+  return ORDER_TYPES_AT_24.has(String(category||'').trim())?24:30;
 }
 
 function calculateOrderProfit(deposit,payment,category=''){
